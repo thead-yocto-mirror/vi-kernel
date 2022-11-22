@@ -79,7 +79,7 @@ static int video_get_pipelines(struct video_drvdata *drvdata, void *__user args)
     pipline_t *cam_pip = drvdata->piplines;
 
     check_retval(copy_to_user(usr_pip, cam_pip, sizeof(pipline_t) * drvdata->pipline_num));
-	video_info("%s, %d, pipnmu: %d\n", __func__, __LINE__, drvdata->pipline_num);
+	video_info("%s, %d, pipeline nmu: %d\n", __func__, __LINE__, drvdata->pipline_num);
     return 0;
 }
 
@@ -93,7 +93,7 @@ static int video_set_path_type(struct video_drvdata *drvdata, void *__user args)
 {
 	pathtype_set_t pathtype_set;
 	check_retval(copy_from_user(&pathtype_set, args, sizeof(pathtype_set_t)));
-	video_info("VIDEO_SET_PATH_TYPE pipeline=%d sensor=%s path_type%d ", pathtype_set.pipeline_id , pathtype_set.sensor_name, pathtype_set.path_type);
+	video_info("VIDEO_SET_PATH_TYPE pipeline=%d sensor=%s path_type%d \n", pathtype_set.pipeline_id , pathtype_set.sensor_name, pathtype_set.path_type);
 	return 0;
 }
 
@@ -102,7 +102,56 @@ static int video_get_mem_pool_region_id(struct video_drvdata *drvdata, void *__u
 	check_retval(copy_to_user(args, &drvdata->vi_mem_pool_region_id, sizeof(int)));
 	return 0;
 }
+static long video_set_state(struct video_drvdata *drvdata,int *arg)
+{
+    int ops;
+    check_retval(copy_from_user(&ops,arg,sizeof(int)));
+    if(ops ==DEVICE_OPERATION_ACTIVE)
+    {
+        if(drvdata->actived == true)
+        {
+            dev_warn(drvdata->dev,"%s,can't ative,device already active by other process(%d)\n",__func__, current->tgid);
+            return (-EBUSY);
+        }else
+        {
+            drvdata->actived =true;
+            drvdata->actived_owner = current->tgid;
+            dev_dbg(drvdata->dev,"%s,actived by process %d\n",__func__,current->tgid);
+        }
+    }
+    else if(ops ==DEVICE_OPERATION_DEACTIVE)
+    {
+        if(drvdata->actived == false)
+        {
+            dev_warn(drvdata->dev,"%s,can't deative,device is not atived\n",__func__);
+            return (-EPERM);
+        }else
+        {
+            if(drvdata->actived_owner != current->tgid)
+            {
+                dev_warn(drvdata->dev,"%s,can't deative,device is active by other process(%d)\n",__func__, current->tgid);
+                return (-EPERM);
+            }
+            drvdata->actived =false;
+            drvdata->actived_owner = -1;
+            dev_dbg(drvdata->dev,"%s de-active",__func__);
+        }
+    }else
+    {
+        dev_warn(drvdata->dev,"%s,un-defined ops\n",__func__);
+        return (-EPERM);
+    }
 
+    return 0;
+}
+
+static long video_get_state(struct video_drvdata *drvdata,int *arg)
+{
+        int ops;
+        ops = drvdata->actived==true?DEVICE_OPERATION_ACTIVE:DEVICE_OPERATION_DEACTIVE;
+        check_retval(copy_to_user(arg, &ops, sizeof(int)));
+        return 0;
+}
 static long video_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	long ret = 0;
@@ -128,9 +177,15 @@ static long video_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case VIDEO_GET_MEM_POOL_REGION_ID:
 		ret = video_get_mem_pool_region_id(drvdata, (void *)arg);
 		break;
+    case VIDEO_SET_DEVICE_STATE:
+        ret = video_set_state(drvdata, (void *)arg);
+        break;
+    case VIDEO_GET_DEVICE_STATE:
+        ret = video_get_state(drvdata, (void *)arg);
+        break;
 	default:
 		ret = -EPERM;
-		video_err("%s: unsupported command %d", __func__, cmd);
+		video_err("%s: unsupported command %d\n", __func__, cmd);
 		break;
 	}
 	mutex_unlock(&drvdata->mutex);
@@ -139,7 +194,19 @@ static long video_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 static int video_release(struct inode * inode, struct file * file)
 {
-	return 0;
+    struct video_drvdata *drvdata;
+	drvdata = container_of(inode->i_cdev, struct video_drvdata, cdev);
+    mutex_lock(&drvdata->mutex);
+    if(drvdata->actived == true &&
+        drvdata->actived_owner == current->tgid)
+    {
+        drvdata->actived = false;
+        drvdata->actived_owner = -1;
+        dev_dbg(drvdata->dev,"%s de-active device\n",__func__);
+    }
+    mutex_unlock(&drvdata->mutex);
+
+    return 0;
 };
 
 static int video_mmap(struct file *pFile, struct vm_area_struct *vma)
@@ -265,6 +332,9 @@ static int video_probe(struct platform_device *pdev)
 	}
 
 	drvdata->device_idx = pdev->id;
+    drvdata->actived = false;
+    drvdata->actived_owner = -1;
+    drvdata->dev = &pdev->dev;
 	mutex_init(&drvdata->mutex);
 	platform_set_drvdata(pdev, drvdata);
 

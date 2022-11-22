@@ -66,6 +66,16 @@ int32_t sensor_reset(void *dev)
 	int ret = 0;
 	struct vvcam_sensor_dev *psensor_dev = (struct vvcam_sensor_dev *)dev;
 
+    if (gpio_is_valid(psensor_dev->rst_pin)) {
+		gpio_direction_output(psensor_dev->rst_pin, 0);
+    }
+
+    if (gpio_is_valid(psensor_dev->pdn_pin)) {
+		gpio_direction_output(psensor_dev->pdn_pin, 0);
+	}
+
+    udelay(10000);
+
 	if (gpio_is_valid(psensor_dev->rst_pin)) {
 		gpio_direction_output(psensor_dev->rst_pin, 1);
     }
@@ -90,7 +100,8 @@ int32_t sensor_get_clk(void *dev, uint32_t *pclk)
 
 int32_t sensor_set_power(void *dev, uint32_t power)
 {
-	int ret = 0, i = 0;
+	int ret = 0, i = 0, set_volt = 0;
+
 	struct vvcam_sensor_dev *psensor_dev = (struct vvcam_sensor_dev *)dev;
 	printk("sensor_set_power enter, power=%d\n", power);
 
@@ -100,19 +111,38 @@ int32_t sensor_set_power(void *dev, uint32_t power)
 	}
 
 	for (i = 0; i < psensor_dev->regulators.num; i++) {
-        if (gpio_is_valid(psensor_dev->rst_pin)) {
-            gpio_direction_output(psensor_dev->rst_pin, 0); // make sure reset is low before power up
-        }
-
-        if (gpio_is_valid(psensor_dev->pdn_pin)) {
-		    gpio_direction_output(psensor_dev->pdn_pin, 0);
-        }
-
+		if (gpio_is_valid(psensor_dev->rst_pin)) {
+			gpio_direction_output(psensor_dev->rst_pin, 0); // make sure reset is low before power up
+		}
+		if (gpio_is_valid(psensor_dev->pdn_pin)) {
+			gpio_direction_output(psensor_dev->pdn_pin, 0);
+		}
 		if (power == 1) {
+			if(psensor_dev->regulators.supply[i] == NULL) {
+				psensor_dev->regulators.supply[i] = devm_regulator_get(psensor_dev->dev, psensor_dev->regulators.name[i]);
+			}
+
+			if(psensor_dev->regulators.voltage[i] != 0) {
+				ret = regulator_set_voltage_tol(psensor_dev->regulators.supply[i], psensor_dev->regulators.voltage[i], 0);
+				if(ret != 0){
+					pr_err("fail to set voltage to %s\n", psensor_dev->regulators.name[i] );
+					return -1;
+				}
+				set_volt = regulator_get_voltage(psensor_dev->regulators.supply[i]);
+				pr_info("%s set regulator %s to %d uV\n",psensor_dev->sensor_name, psensor_dev->regulators.name[i], set_volt );
+			}
 			ret = regulator_enable(psensor_dev->regulators.supply[i]);
-			printk("regulator_enable ret=%d\n", ret);
 		} else if (power == 0) {
+			if (psensor_dev->regulators.supply[i] == NULL) {
+				pr_info("the supply already is null\n");
+				return 0;
+			}
+			pr_info("%s disable regulator %s \n",psensor_dev->sensor_name, psensor_dev->regulators.name[i] );
 			ret = regulator_disable(psensor_dev->regulators.supply[i]);
+			if (ret == 0) {
+				devm_regulator_put(psensor_dev->regulators.supply[i]);
+				psensor_dev->regulators.supply[i] = NULL;
+			}
 		} else {
 			return -1;
 		}

@@ -97,6 +97,7 @@ struct vvcam_dwe_driver_dev
 	struct clk *hclk;
 	struct clk *vseclk;
 	struct clk *dweclk;
+	struct task_struct *locker;
 };
 
 struct vvcam_dwe_per_file_dev
@@ -231,6 +232,14 @@ static long vvcam_dwe_ioctl(struct file *file, unsigned int cmd, unsigned long a
 		case DW200IOC_RUNTIME_SUSPEND:
 			pm_runtime_put_sync(dev);
 			break;
+		case DW200IOC_LOCK:
+			mutex_lock(pdwe_dev->vvmutex);
+			pdriver_dev->locker = current;
+			break;
+		case DW200IOC_UNLOCK:
+			mutex_unlock(pdwe_dev->vvmutex);
+			pdriver_dev->locker = NULL;
+			break;
 	}
 	ret =  dw200_priv_ioctl(pdwe_dev, cmd ,(void *)arg);
 	return ret;
@@ -241,7 +250,12 @@ static int vvcam_dwe_release(struct inode * inode, struct file * file)
 	struct vvcam_dwe_per_file_dev *per_file = (struct vvcam_dwe_per_file_dev *)file->private_data;
 	struct dw200_subdev * pdw200;
 	pdw200 = (struct dw200_subdev *)per_file->private;
-	mutex_unlock(pdw200->vvmutex);
+	struct vvcam_dwe_driver_dev *pdriver_dev = per_file->pdriver_dev;
+	struct task_struct *owner =  (struct task_struct *)(atomic_long_read(&pdw200->vvmutex->owner) & ~0x07);
+	if (owner == pdriver_dev->locker && owner != NULL) {
+		printk("unlocked with owner=%p\n", owner);
+		mutex_unlock(pdw200->vvmutex);
+	}
 	/*destory circle queue*/
 	vivdw200_destroy_circle_queue(&(pdw200->dwe_circle_list));
 	vivdw200_destroy_circle_queue(&(pdw200->vse_circle_list));

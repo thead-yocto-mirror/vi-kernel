@@ -333,10 +333,13 @@ struct vi_pre_dev {
 	struct mutex mutex;
 	void __iomem *reg_base;
 	unsigned long cnt; //used to cnt frame num or line num;
+    int update_frame_id;
+    int update_vc_id;
 	bool is_mframe_mode;
     struct clk *aclk;
     struct clk *pclk;
     struct clk *pixclk;
     struct platform_device *pdev;
 };
+
 #endif/*__VI_PRE_H__*/

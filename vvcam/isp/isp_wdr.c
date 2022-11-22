@@ -63,7 +63,7 @@ int isp_s_wdr(struct isp_ic_dev *dev)
 {
     isp_wdr_context_t* wdr = &dev->wdr;
 
-    pr_info(" enter %s\n", __func__);
+    isp_info(" enter %s\n", __func__);
 
     /*update wdr configuration  after frame end when isp enable*/
     if (!is_isp_enable(dev) || wdr->changed) {
@@ -81,7 +81,7 @@ int isp_s_wdr(struct isp_ic_dev *dev)
     } else {
         wdr->changed = true;
     }
-    pr_info(" %s wdr.changed %d \n", __func__, wdr->changed);
+    isp_info(" %s wdr.changed %d \n", __func__, wdr->changed);
    	return 0;
 }
 

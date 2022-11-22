@@ -10,11 +10,11 @@ $(TARGET)-objs += video_hw_info.o
 $(TARGET)-objs += subdev.o
 
 EXTRA_CFLAGS += -I$(PWD)/../../common
-
+ccflags-$(CONFIG_DEBUG)  += -DDEBUG
 PWD :=$(shell pwd)
 
 all:
-	make   -C $(KERNEL) M=$(PWD)  modules
+	make   -C $(KERNEL) M=$(PWD) CONFIG_DEBUG=y  modules
 modules_install:
 	make -C $(KERNEL_SRC) M=$(SRC) modules_install
 clean:

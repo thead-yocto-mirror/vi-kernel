@@ -114,12 +114,12 @@ static void wdr3_hw_init(struct isp_ic_dev *dev)
 	bool reg_flag = false;
 	int i, pos;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	width = isp_read_reg(dev, REG_ADDR(isp_acq_h_size));
 	height = isp_read_reg(dev, REG_ADDR(isp_acq_v_size));
 
-	pr_info("wdr3 res: %d %d \n", width, height);
+	isp_info("wdr3 res: %d %d \n", width, height);
 	/* firware initilization */
 	slice_pixel_slope_merge = 128;
 	slice_pixel_base_merge = 0;
@@ -417,7 +417,7 @@ static void wdr3_hw_init(struct isp_ic_dev *dev)
 int isp_enable_wdr3(struct isp_ic_dev *dev)
 {
 #ifndef ISP_WDR_V3
-	pr_err("unsupported function: %s", __func__);
+	isp_err("unsupported function: %s", __func__);
 	return -EINVAL;
 #else
 	struct isp_wdr3_context *wdr3 = &dev->wdr3;
@@ -438,7 +438,7 @@ int isp_enable_wdr3(struct isp_ic_dev *dev)
 int isp_disable_wdr3(struct isp_ic_dev *dev)
 {
 #ifndef ISP_WDR_V3
-	pr_err("unsupported function: %s", __func__);
+	isp_err("unsupported function: %s", __func__);
 	return -EINVAL;
 #else
 	struct isp_wdr3_context *wdr3 = &dev->wdr3;
@@ -459,7 +459,7 @@ int isp_disable_wdr3(struct isp_ic_dev *dev)
 int isp_u_wdr3(struct isp_ic_dev *dev)
 {
 #ifndef ISP_WDR_V3
-	pr_err("unsupported function: %s", __func__);
+	isp_err("unsupported function: %s", __func__);
 	return -EINVAL;
 #else
 	wdr3_hw_init(dev);
@@ -471,7 +471,7 @@ int isp_s_wdr3(struct isp_ic_dev *dev)
 {
 
 #ifndef ISP_WDR_V3
-	pr_err("unsupported function: %s", __func__);
+	isp_err("unsupported function: %s", __func__);
 	return -EINVAL;
 #else
 	struct isp_wdr3_context *wdr3 = &dev->wdr3;

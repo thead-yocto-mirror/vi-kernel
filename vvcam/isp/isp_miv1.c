@@ -88,7 +88,7 @@ static int getRawBit(u32 type, u32 *bit, u32 *len)
 		break;
 #endif
 	default:
-		pr_err("unsupport raw formt: %d\n", type);
+		isp_err("unsupport raw formt: %d\n", type);
 		return -1;
 	}
 	return 0;
@@ -104,7 +104,7 @@ int isp_ioc_start_dma_read(struct isp_ic_dev *dev, void __user *args)
 	u32 llength = 0, mcm_rd_fmt_bit = 0;
 	u32 mi_imsc = 0, mcm_fmt = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	viv_check_retval(copy_from_user(&dma, args, sizeof(dma)));
 
 	REG_SET_SLICE(mi_dma_ctrl, MRV_MI_DMA_BURST_LEN_LUM, dma.burst_y);
@@ -240,7 +240,7 @@ int isp_bppath_start(struct isp_ic_dev *dev)
 	u32 mi_imsc = isp_read_reg(dev, REG_ADDR(mi_imsc));
 	int i;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	bp_ctrl = 0;
 	lval = path->out_width;
 
@@ -336,7 +336,7 @@ int isp_mi_start(struct isp_ic_dev *dev)
 	int i;
 	u8 retry = 3;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	isp_write_reg(dev, REG_ADDR(mrsz_ctrl), 0);
 	isp_write_reg(dev, REG_ADDR(mrsz_ctrl_shd), 0);
@@ -432,7 +432,7 @@ int isp_mi_start(struct isp_ic_dev *dev)
 			}
 		}
 		if(retry == i) {
-			pr_info("%s: update mi_mp_y_pic_width error!\n", __func__);
+			isp_info("%s: update mi_mp_y_pic_width error!\n", __func__);
 		}
 
 		/* enable frame end irq for  main path */
@@ -541,7 +541,7 @@ int isp_mi_start(struct isp_ic_dev *dev)
 int isp_mi_stop(struct isp_ic_dev *dev)
 {
 	u32 mi_ctrl = 0, mi_init = 0;
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	isp_write_reg(dev, REG_ADDR(mi_imsc), 0);
 
@@ -570,7 +570,7 @@ int isp_set_buffer(struct isp_ic_dev *dev, struct isp_buffer_context *buf)
 	u32 addr;
 
 	if (!dev || !buf) {
-		pr_err("NULL pointer %s\n", __func__);
+		isp_err("NULL pointer %s\n", __func__);
 		return -EINVAL;
 	}
 
@@ -597,7 +597,7 @@ int isp_set_buffer(struct isp_ic_dev *dev, struct isp_buffer_context *buf)
 int isp_set_bp_buffer(struct isp_ic_dev *dev, struct isp_bp_buffer_context *buf)
 {
 #ifndef ISP_MI_BP
-	pr_err("unsupported function: %s", __func__);
+	isp_err("unsupported function: %s", __func__);
 	return -EINVAL;
 #else
 	isp_write_reg(dev, REG_ADDR(mi_bp_r_base_ad_init),

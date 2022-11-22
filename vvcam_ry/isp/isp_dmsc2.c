@@ -65,7 +65,7 @@ int isp_enable_dmsc(struct isp_ic_dev *dev)
 	u32 isp_dmsc_ctrl = isp_read_reg(dev, REG_ADDR(isp_dmsc_ctrl));
 	u32 isp_dmsc_size_ctrl =
 	    isp_read_reg(dev, REG_ADDR(isp_dmsc_size_ctrl));
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	REG_SET_SLICE(isp_dmsc_ctrl, ISP_DEMOSAIC_BYPASS, 0U);
 	REG_SET_SLICE(isp_dmsc_size_ctrl, ISP_DMSC_IMAGE_H_SIZE,
 		      isp_read_reg(dev, REG_ADDR(isp_acq_h_size)));
@@ -81,7 +81,7 @@ int isp_disable_dmsc(struct isp_ic_dev *dev)
 	u32 isp_dmsc_ctrl = isp_read_reg(dev, REG_ADDR(isp_dmsc_ctrl));
 	isp_dmsc_ctrl = 0;	//clear fpga default bit 3 and 13 to keep the same value with cmodel.
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	REG_SET_SLICE(isp_dmsc_ctrl, ISP_DEMOSAIC_BYPASS, 1U);
 
 	/*clear the reg default val to keep weith cmodel  */
@@ -103,7 +103,7 @@ int isp_disable_dmsc(struct isp_ic_dev *dev)
 int isp_set_dmsc_intp(struct isp_ic_dev *dev)
 {
 	u32 isp_dmsc_intp_thr = isp_read_reg(dev, REG_ADDR(isp_dmsc_intp_thr));
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	REG_SET_SLICE(isp_dmsc_intp_thr, ISP_DMSC_INTERPLATION_DIR_THR_MAX,
 		      dev->demosaic.intp.intp_dir_thr_max);
 	REG_SET_SLICE(isp_dmsc_intp_thr, ISP_DMSC_INTERPLATION_DIR_THR_MIN,
@@ -123,7 +123,7 @@ int isp_set_dmsc_dmoi(struct isp_ic_dev *dev)
 	    isp_read_reg(dev, REG_ADDR(isp_dmsc_dmoi_patn_thr));
 	u32 isp_dmsc_ctrl = isp_read_reg(dev, REG_ADDR(isp_dmsc_ctrl));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	if (!pDemoire->enable) {
 		REG_SET_SLICE(isp_dmsc_ctrl, ISP_DEMOSAIC_DEMOIRE_ENABLE, 0U);
@@ -172,7 +172,7 @@ int isp_set_dmsc_sharpen(struct isp_ic_dev *dev)
 	    isp_read_reg(dev, REG_ADDR(isp_dmsc_shap_ratio));
 	u32 isp_dmsc_ctrl = isp_read_reg(dev, REG_ADDR(isp_dmsc_ctrl));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	if (!pSharpen->enable) {
 		REG_SET_SLICE(isp_dmsc_ctrl, ISP_DEMOSAIC_SHARPEN_ENBALE, 0);
@@ -222,7 +222,7 @@ int isp_set_dmsc_gfilter(struct isp_ic_dev *dev)
 	    isp_read_reg(dev, REG_ADDR(isp_dmsc_shap_filt1));
 	u32 isp_dmsc_shap_filt2 =
 	    isp_read_reg(dev, REG_ADDR(isp_dmsc_shap_filt2));
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	REG_SET_SLICE(isp_dmsc_shap_filt1, ISP_DMSC_HF_FILT_00,
 		      pgfilter->hf_filt_00);
@@ -261,7 +261,7 @@ int isp_set_dmsc_sharpen_line(struct isp_ic_dev *dev)
 	    isp_read_reg(dev, REG_ADDR(isp_dmsc_shap_line_ratio));
 	u32 isp_dmsc_ctrl = isp_read_reg(dev, REG_ADDR(isp_dmsc_ctrl));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	if (!sharpenLine->enable) {
 		REG_SET_SLICE(isp_dmsc_ctrl, ISP_DEMOSAIC_SHARPEN_LINE_ENABLE, 0);
@@ -299,7 +299,7 @@ int isp_set_dmsc_cac(struct isp_ic_dev *dev)
 	u32 val = 0;
 	u32 isp_dmsc_cac_ctrl = isp_read_reg(dev, REG_ADDR(isp_dmsc_cac_ctrl));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	if (!cac->enable) {
 		REG_SET_SLICE(isp_dmsc_cac_ctrl, MRV_CAC_CAC_EN, 0);
@@ -336,7 +336,7 @@ int isp_set_dmsc_depurple(struct isp_ic_dev *dev)
 	    isp_read_reg(dev, REG_ADDR(isp_dmsc_dpul_ctrl));
 	u32 isp_dmsc_ctrl = isp_read_reg(dev, REG_ADDR(isp_dmsc_ctrl));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!depurple->enable) {
 		REG_SET_SLICE(isp_dmsc_ctrl, ISP_DEMOSAIC_DEPURPLE_ENABLE, 0U);
 		isp_write_reg(dev, REG_ADDR(isp_dmsc_ctrl), isp_dmsc_ctrl);
@@ -368,7 +368,7 @@ int isp_set_dmsc_skin(struct isp_ic_dev *dev)
 
 	u32 isp_dmsc_ctrl = isp_read_reg(dev, REG_ADDR(isp_dmsc_ctrl));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!skin->enable) {
 		REG_SET_SLICE(isp_dmsc_ctrl, ISP_DEMOSAIC_SKIN_ENABLE, 0U);
 		isp_write_reg(dev, REG_ADDR(isp_dmsc_ctrl), isp_dmsc_ctrl);
@@ -406,7 +406,7 @@ int isp_s_dmsc(struct isp_ic_dev *dev)
 	isp_disable_dmsc(dev);
 
 	isp_dmsc_ctrl = isp_read_reg(dev, REG_ADDR(isp_dmsc_ctrl));
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!dev->demosaic.enable) {
 		isp_disable_dmsc(dev);
 		return 0;

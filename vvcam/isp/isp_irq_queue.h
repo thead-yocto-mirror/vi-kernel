@@ -69,8 +69,8 @@
 } isp_src_t;
 
 typedef struct isp_mis_s {
-	unsigned int irq_src;
-	unsigned int val;
+	uint64_t irq_src;
+	uint64_t val;
 #ifdef __KERNEL__
   struct list_head list;
 #endif

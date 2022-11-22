@@ -165,11 +165,60 @@ static void vvnative_isp_work(struct work_struct *work)
 
 }
 
-static irqreturn_t vvcam_isp_irq(int irq, void *dev_id)
+static irqreturn_t vvcam_ry_isp_irq(int irq, void *dev_id)
 {
 	struct vvcam_isp_driver_dev *pdriver_dev ;
 	struct isp_ic_dev * pisp_dev;
-    u32 isp_mis, mi_mis, mi_mis_addr, mi_icr_addr;
+    u64 isp_mis, mi_mis = 0;
+
+	pdriver_dev = (struct vvcam_isp_driver_dev *)dev_id;
+	pisp_dev = pdriver_dev->private;
+    isp_mis = isp_read_reg(pisp_dev, REG_ADDR(isp_mis));
+
+  if (isp_mis) {
+	  isp_mis_t mis_data;
+	  mis_data.irq_src = SRC_ISP_IRQ;
+	  mis_data.val = isp_mis;
+	  pisp_dev->isp_mis = isp_mis;
+	  isp_irq_write_circle_queue(&mis_data, &pisp_dev->circle_list);
+	  isp_write_reg(pisp_dev, REG_ADDR(isp_icr), isp_mis);
+	  if(isp_mis & MRV_ISP_MIS_ISP_OFF_MASK) {
+		  isp_write_reg(pisp_dev, REG_ADDR(isp_imsc), isp_read_reg(pisp_dev, REG_ADDR(isp_imsc))&(~MRV_ISP_MIS_ISP_OFF_MASK));
+	  }
+  if (isp_mis & MRV_ISP_MIS_FLASH_ON_MASK)
+	  mi_mis |= 0x1;
+  }
+
+  if (isp_mis & MRV_ISP_MIS_VSM_END_MASK) { // MP_JDP_FRAME_END
+    //isp_info("%s MRV_ISP_MIS_VSM_END_MASK >>> MP_JDP_FRAME_END_MASK...\n", __func__);
+    mi_mis |= MP_JDP_FRAME_END_MASK;
+  }
+
+  if (isp_mis & MRV_ISP_MIS_SHUTTER_OFF_MASK) { // drop frame
+	//isp_info("%s drop frame\n", __func__);
+	mi_mis = 0x100000001;
+  }
+
+  if (mi_mis) {
+	isp_mis_t mis_data;
+	mis_data.irq_src = SRC_MI_IRQ;
+	mis_data.val = mi_mis;
+	isp_irq_write_circle_queue(&mis_data, &pisp_dev->circle_list);
+  }
+
+  if (isp_mis != 0 ||mi_mis != 0 ) {
+    schedule_work(&pdriver_dev->vvnative_wq);
+  } else {
+	return IRQ_HANDLED; // return IRQ_NONE;
+  }
+    return IRQ_HANDLED;
+}
+
+static irqreturn_t vvcam_ry_mi_irq(int irq, void *dev_id)
+{
+	struct vvcam_isp_driver_dev *pdriver_dev ;
+	struct isp_ic_dev * pisp_dev;
+    u32 mi_mis, mi_mis_addr, mi_icr_addr;
 #ifdef ISP_MIV2_RY
 	u32 miv2_mis1, miv2_mis3;
 #endif
@@ -178,7 +227,6 @@ static irqreturn_t vvcam_isp_irq(int irq, void *dev_id)
 #endif
 	pdriver_dev = (struct vvcam_isp_driver_dev *)dev_id;
 	pisp_dev = pdriver_dev->private;
-    isp_mis = isp_read_reg(pisp_dev, REG_ADDR(isp_mis));
 #ifdef ISP_MIV2_RY
 	mi_icr_addr = REG_ADDR(miv2_icr);
 	mi_mis_addr = REG_ADDR(miv2_mis);
@@ -208,19 +256,6 @@ static irqreturn_t vvcam_isp_irq(int irq, void *dev_id)
 	/*pr_info("%s isp mis 0x%08x, mi mis 0x%08x\n", __func__,  \
 		isp_mis, mi_mis);*/
 #endif
-  if (isp_mis) {
-	  isp_mis_t mis_data;
-	  mis_data.irq_src = SRC_ISP_IRQ;
-	  mis_data.val = isp_mis;
-	  pisp_dev->isp_mis = isp_mis;
-	  isp_irq_write_circle_queue(&mis_data, &pisp_dev->circle_list);
-	  isp_write_reg(pisp_dev, REG_ADDR(isp_icr), isp_mis);
-	  if(isp_mis & MRV_ISP_MIS_ISP_OFF_MASK) {
-		  isp_write_reg(pisp_dev, REG_ADDR(isp_imsc), isp_read_reg(pisp_dev, REG_ADDR(isp_imsc))&(~MRV_ISP_MIS_ISP_OFF_MASK));
-	  }
-  if (isp_mis & MRV_ISP_MIS_FLASH_ON_MASK)
-	  mi_mis |= 0x1;
-  }
 
   if (mi_mis) {
 	isp_mis_t mis_data;
@@ -250,10 +285,11 @@ static irqreturn_t vvcam_isp_irq(int irq, void *dev_id)
   	isp_write_reg(pisp_dev, REG_ADDR(miv2_icr2), miv2_mis2);
   }
 #endif
+
  #if defined(ISP_MI_PP_READ_RY) || defined (ISP_3DNR_V3) || defined (ISP_MI_PP_WRITE_RY) ||  defined (ISP_MI_HDR_RY)
-   if (isp_mis != 0 ||mi_mis != 0 || miv2_mis2 != 0) {
+   if (mi_mis != 0 || miv2_mis2 != 0) {
  #else
-  if (isp_mis != 0 ||mi_mis != 0 ) {
+  if (mi_mis != 0 ) {
 #endif
     schedule_work(&pdriver_dev->vvnative_wq);
   } else {
@@ -353,7 +389,7 @@ static int vvcam_isp_release(struct inode * inode, struct file * file)
 	struct vvcam_isp_driver_dev *pdriver_dev;
 	struct isp_ic_dev *pisp_dev;
 	if ((inode == NULL) || (file == NULL) ) {
-		printk("%s: %dx\n", __func__, __LINE__);
+		isp_info("%s: %dx\n", __func__, __LINE__);
 		return 0;
 	}
 
@@ -364,6 +400,19 @@ static int vvcam_isp_release(struct inode * inode, struct file * file)
 	isp_irq_destroy_circle_queue(&(pisp_dev->circle_list));
 
 	struct device *dev = &pdriver_dev->pdev->dev;
+    if (pisp_dev->ut_addr != NULL) {
+        #define UT_USED_SIZE 0x01000000
+        dma_free_coherent(dev, UT_USED_SIZE,
+                          pisp_dev->ut_addr, pisp_dev->ut_phy_addr);
+        pisp_dev->ut_addr=NULL;
+    }
+
+    if (pisp_dev->ut_addr != NULL) {
+        #define UT_USED_SIZE 0x01000000
+        dma_free_coherent(dev, UT_USED_SIZE,
+                          pisp_dev->ut_addr, pisp_dev->ut_phy_addr);
+        pisp_dev->ut_addr = NULL;
+    }
 
 	if (pm_runtime_put_sync(dev)) {
 		pr_info("fail to resume isp %s %d\n", __func__, __LINE__);
@@ -469,14 +518,14 @@ static int vvcam_isp_probe(struct platform_device *pdev)
 	/*init work queue*/
 	INIT_WORK(&pdriver_dev->vvnative_wq,  vvnative_isp_work);
 
-	ret = devm_request_irq(&pdev->dev, pdriver_dev->irq_num[0], vvcam_isp_irq,
+	ret = devm_request_irq(&pdev->dev, pdriver_dev->irq_num[0], vvcam_ry_isp_irq,
 				IRQF_TRIGGER_RISING | IRQF_SHARED, "ISP_IRQ", (char *)pdriver_dev);
 	if (ret) {
 		pr_err("%s[%d]:request irq error!\n", __func__, __LINE__);
 		return ret;
 	}
 
-	ret = devm_request_irq(&pdev->dev, pdriver_dev->irq_num[1], vvcam_isp_irq,
+	ret = devm_request_irq(&pdev->dev, pdriver_dev->irq_num[1], vvcam_ry_mi_irq,
 		IRQF_TRIGGER_RISING, "MI_IRQ", (char *)pdriver_dev);
 	if (ret) {
 		pr_err("%s[%d]:request irq error!\n", __func__, __LINE__);
@@ -577,6 +626,7 @@ static int vvcam_isp_remove(struct platform_device *pdev)
         #define UT_USED_SIZE 0x01000000
         dma_free_coherent(&pdev->dev, UT_USED_SIZE,
                           pisp_dev->ut_addr, pisp_dev->ut_phy_addr);
+        pisp_dev->ut_addr = NULL;
     }
 
 	free_irq(pdriver_dev->irq_num[0], pdriver_dev);

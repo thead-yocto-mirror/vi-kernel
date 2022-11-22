@@ -80,7 +80,7 @@ static int sensor_press_dts(struct fwnode_handle *node, sub_dev_info_t *subdev)
     */
     int ret = 0;
 
-    uint32_t csi_idx, flash_led_idx;
+    uint32_t csi_idx, flash_led_idx, mode_idx;
 
     ret = fwnode_property_read_u32_array(node, "csi_idx", &csi_idx, 1);
     if(ret != 0) {
@@ -92,13 +92,20 @@ static int sensor_press_dts(struct fwnode_handle *node, sub_dev_info_t *subdev)
         flash_led_idx = -1;
     }
 
+    ret = fwnode_property_read_u32_array(node, "mode_idx", &mode_idx, 1);
+    if(ret != 0) {
+        mode_idx = -1;
+    }
+
 	video_info("flash_led idx is %u\n", flash_led_idx);
 
     subdev->param[0] = (char)csi_idx;
     subdev->param[1] = fwnode_property_read_bool(node, "skip_init");
     subdev->param[2] = (char)flash_led_idx;
+    subdev->param[3] = (char)mode_idx;
     video_info("subdev->param[0] is %d\n", subdev->param[0]);
     video_info("subdev->param[2] is %d\n", subdev->param[2]);
+    video_info("subdev->param[3] is %d\n", subdev->param[3]);
     subdev->param_size = 3;
     return 0;
 }

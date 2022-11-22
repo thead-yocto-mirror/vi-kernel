@@ -189,7 +189,7 @@ int isp_u_3dnr_strength(struct isp_ic_dev *dev)
 
     isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
     REG_SET_SLICE(isp_ctrl, MRV_ISP_ISP_GEN_CFG_UPD, 1);
-    
+
     isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl);
 
 	return 0;
@@ -208,11 +208,11 @@ int isp_s_3dnr(struct isp_ic_dev *dev)
 
 	u32 isp_denoise3d_strength, isp_denoise3d_motion, isp_denoise3d_delta_inv;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (dnr3->update_bin) {
 		dnr3_hw_init(dev);
 	}
-  
+
 	isp_denoise3d_motion =
 	    isp_read_reg(dev, REG_ADDR(isp_denoise3d_motion));
         REG_SET_SLICE(isp_denoise3d_motion, DENOISE3D_MOTION_INV, dnr3->motion_factor);
@@ -232,7 +232,7 @@ int isp_s_3dnr(struct isp_ic_dev *dev)
 	    REG_SET_SLICE(isp_denoise3d_strength, DENOISE3D_STRENGTH, dnr3->strength);
 		isp_denoise3d_ctrl = isp_read_reg(dev, REG_ADDR(isp_denoise3d_ctrl));
 		REG_SET_SLICE(isp_denoise3d_ctrl, DENOISE3D_ENABLE, dnr3->enable);
-		
+
 		isp_write_reg(dev, REG_ADDR(isp_denoise3d_ctrl), isp_denoise3d_ctrl);
 
 	}
@@ -241,10 +241,10 @@ int isp_s_3dnr(struct isp_ic_dev *dev)
    isp_denoise3d_ctrl = isp_read_reg(dev, REG_ADDR(isp_denoise3d_ctrl));
    REG_SET_SLICE(isp_denoise3d_ctrl, DENOISE3D_ENABLE, dnr3->enable);
    isp_write_reg(dev, REG_ADDR(isp_denoise3d_ctrl), isp_denoise3d_ctrl);
-   
+
     u32 isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
     REG_SET_SLICE(isp_ctrl, MRV_ISP_ISP_GEN_CFG_UPD, 1);
-    
+
     isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl);
 #endif
 	return 0;
@@ -308,7 +308,7 @@ int isp_u_3dnr(struct isp_ic_dev *dev, struct isp_3dnr_update *dnr3_update)
 #else
 	u32 regVal = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	regVal = isp_read_reg(dev, REG_ADDR(isp_denoise3d_strength));
 	REG_SET_SLICE(regVal, DENOISE3D_STRENGTH, dev->dnr3.strength);
 	isp_write_reg(dev, REG_ADDR(isp_denoise3d_strength), regVal);
@@ -353,7 +353,7 @@ int isp_u_3dnr(struct isp_ic_dev *dev, struct isp_3dnr_update *dnr3_update)
 #ifdef NR200
     u32 isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
     REG_SET_SLICE(isp_ctrl, MRV_ISP_ISP_GEN_CFG_UPD, 1);
-    
+
     isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl);
 #endif
 	return 0;
@@ -388,7 +388,7 @@ int isp_r_3dnr(struct isp_ic_dev *dev)
 	REG_SET_SLICE(miv2_ctrl, SP2_RAW_RDMA_PATH_ENABLE, 1);
 	REG_SET_SLICE(miv2_ctrl, SP2_RAW_PATH_ENABLE, 1);
 	isp_write_reg(dev, REG_ADDR(miv2_ctrl), miv2_ctrl);
-	
+
 
 #ifndef NR200
 	in_width = isp_read_reg(dev, REG_ADDR(isp_acq_h_size));
@@ -398,9 +398,9 @@ int isp_r_3dnr(struct isp_ic_dev *dev)
 	in_height = isp_read_reg(dev, REG_ADDR(isp_out_v_size));
 #endif
     lval = (in_width * 12 + 127)/ 128;
-		
+
     lval <<= 4;
-		
+
     size = in_height * lval;        //raw12 unaligned
 	//write reference frame config
 	isp_write_reg(dev, REG_ADDR(miv2_sp2_raw_base_ad_init), dev->dnr3.pa);
@@ -412,13 +412,13 @@ int isp_r_3dnr(struct isp_ic_dev *dev)
 	isp_write_reg(dev, REG_ADDR(miv2_sp2_raw_pic_size), size);
 
     miv2_sp2_bus_id = isp_read_reg(dev, REG_ADDR(miv2_sp2_bus_id));
-    
+
     REG_SET_SLICE(miv2_sp2_bus_id, SP2_WR_ID_EN, 1);
     REG_SET_SLICE(miv2_sp2_bus_id, SP2_RD_ID_EN, 1);
     REG_SET_SLICE(miv2_sp2_bus_id, SP2_RD_BURST_LEN, 2); //sp2 rd burst lenghth 16
     REG_SET_SLICE(miv2_sp2_bus_id, SP2_BUS_SW_EN, 1);
-    
-    isp_write_reg(dev, REG_ADDR(miv2_sp2_bus_id), miv2_sp2_bus_id); 
+
+    isp_write_reg(dev, REG_ADDR(miv2_sp2_bus_id), miv2_sp2_bus_id);
 
     miv2_sp2_fmt = isp_read_reg(dev, REG_ADDR(miv2_sp2_fmt));
     REG_SET_SLICE(miv2_sp2_fmt, SP2_WR_RAW_BIT, 2);    //raw12
@@ -427,8 +427,8 @@ int isp_r_3dnr(struct isp_ic_dev *dev)
     REG_SET_SLICE(miv2_sp2_fmt, SP2_RD_RAW_BIT, 2);   //raw12
     REG_SET_SLICE(miv2_sp2_fmt, SP2_RD_RAW_ALIGNED, 0); //unaligned
 
-	isp_write_reg(dev, REG_ADDR(miv2_sp2_fmt), miv2_sp2_fmt); 
-	
+	isp_write_reg(dev, REG_ADDR(miv2_sp2_fmt), miv2_sp2_fmt);
+
 	//read reference frame config
 	isp_write_reg(dev, REG_ADDR(miv2_sp2_dma_raw_pic_start_ad), dev->dnr3.pa);
 	isp_write_reg(dev, REG_ADDR(miv2_sp2_dma_raw_pic_width), in_width);

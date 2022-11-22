@@ -16,14 +16,21 @@ typedef enum sensor_path_type{
     SENSOR_VGA_RAW10_LINER = 20,
     SENSOR_1080P_RAW10_LINER,
     SENSOR_4K_RAW10_LINER,
+    SENSOR_1296x972_RAW10_LINER,
     SENSOR_2592x1944_RAW10_LINER,
     SENSOR_1280x720_RAW10_LINER,
+    SENSOR_1600x1200_RAW10_LINER,
+    SENSOR_3280x2464_RAW10_LINER,
+    SENSOR_1640x1232_RAW10_LINER,
     SENSOR_VGA_RAW12_HDR_2DOL,
     SENSOR_VGA_RAW12_HDR_3DOL,
     SENSOR_PATH_MAX,
 } sensor_path_type_e;
 
 typedef enum vipre_path_type{
+    VIPRE_CSI0_DSP,
+    VIPRE_CSI1_DSP,
+    VIPRE_CSI2_DSP,
     VIPRE_CSI0_DDR,
     VIPRE_CSI1_DDR,
     VIPRE_CSI2_DDR,
@@ -37,7 +44,6 @@ typedef enum vipre_path_type{
     VIPRE_CSI1_LOW_COAST_HDR_ISP0,
     VIPRE_CSI2_LOW_COAST_HDR_ISP0,
     VIPRE_PATH_MAX,
-
 } vipre_path_type_e;
 
 typedef enum isp_path_type{
@@ -54,8 +60,8 @@ typedef enum isp_path_type{
 	ISP_MI_HDR_L,
 	ISP_MI_HDR_S,
 	ISP_MI_HDR_VS,
-	ISP_MI_MAX,
 #endif
+	ISP_MI_MAX,
 } isp_path_type_e;
 
 typedef enum ry_path_type{

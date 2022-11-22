@@ -63,16 +63,7 @@
 #include <linux/regmap.h>
 #include <linux/of_reserved_mem.h>
 #endif
-
-#ifdef CONFIG_VSI_ISP_DEBUG
-#define isp_info(fmt, ...)	pr_info(fmt, ##__VA_ARGS__)
-#define isp_debug(fmt, ...)  pr_debug(fmt, ##__VA_ARGS__)
-#define isp_err(fmt, ...)  pr_err(fmt, ##__VA_ARGS__)
-#else
-#define isp_info(fmt, ...)
-#define isp_debug(fmt, ...)
-#define isp_err(fmt, ...)  pr_err(fmt, ##__VA_ARGS__)
-#endif
+#include "isp_ioctl.h"
 
 volatile MrvAllRegister_t *all_regs = NULL;
 
@@ -87,7 +78,7 @@ void isp_ic_set_hal(HalHandle_t hal)
 
 void isp_write_reg(struct isp_ic_dev *dev, u32 offset, u32 val)
 {
-	//pr_info("%s addr 0x%08x val 0x%08x\n", __func__, offset, val);
+	//isp_info("%s addr 0x%08x val 0x%08x\n", __func__, offset, val);
 	if (offset >= ISP_REG_SIZE)
 		return;
 	HalWriteReg(hal_handle, offset, val);
@@ -417,29 +408,34 @@ int isp_s_input(struct isp_ic_dev *dev)
 
 int isp_s_digital_gain(struct isp_ic_dev *dev)
 {
-	struct isp_digital_gain_cxt dgain = *(&dev->dgain);
-	u32 isp_dgain_rb = isp_read_reg(dev, REG_ADDR(isp_dgain_rb));
-	u32 isp_dgain_g = isp_read_reg(dev, REG_ADDR(isp_dgain_g));
-	u32 isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
-	if (!dgain.enable) {
-		isp_err("%s, Disable isp digital gain", __func__);
-		REG_SET_SLICE(isp_ctrl, MRV_ISP_DIGITAL_GAIN_EN, 0U);
+	if (dev->dgain.changed) {
+		u32 isp_dgain_rb = isp_read_reg(dev, REG_ADDR(isp_dgain_rb));
+		u32 isp_dgain_g = isp_read_reg(dev, REG_ADDR(isp_dgain_g));
+		u32 isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
+		if (!dev->dgain.enable) {
+			isp_err("%s, Disable isp digital gain", __func__);
+			REG_SET_SLICE(isp_ctrl, MRV_ISP_DIGITAL_GAIN_EN, 0U);
+			isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl);
+			return 0;
+		}
+
+		//isp_info("enter %s\n", __func__);
+		REG_SET_SLICE(isp_dgain_rb, ISP_DIGITAL_GAIN_R, dev->dgain.gain_r);
+		REG_SET_SLICE(isp_dgain_rb, ISP_DIGITAL_GAIN_B, dev->dgain.gain_b);
+
+		REG_SET_SLICE(isp_dgain_g, ISP_DIGITAL_GAIN_GR, dev->dgain.gain_gr);
+		REG_SET_SLICE(isp_dgain_g, ISP_DIGITAL_GAIN_GB, dev->dgain.gain_gb);
+		REG_SET_SLICE(isp_ctrl, MRV_ISP_DIGITAL_GAIN_EN, 1U);
+
+		isp_write_reg(dev, REG_ADDR(isp_dgain_rb), isp_dgain_rb);
+		isp_write_reg(dev, REG_ADDR(isp_dgain_g), isp_dgain_g);
 		isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl);
-		return 0;
+		//isp_info("exit %s\n", __func__);
+		dev->dgain.changed = false;
+	} else {
+		dev->dgain.changed = true;
 	}
 
-	//isp_info("enter %s\n", __func__);
-	REG_SET_SLICE(isp_dgain_rb, ISP_DIGITAL_GAIN_R, dgain.gain_r);
-	REG_SET_SLICE(isp_dgain_rb, ISP_DIGITAL_GAIN_B, dgain.gain_b);
-
-	REG_SET_SLICE(isp_dgain_g, ISP_DIGITAL_GAIN_GR, dgain.gain_gr);
-	REG_SET_SLICE(isp_dgain_g, ISP_DIGITAL_GAIN_GB, dgain.gain_gb);
-	REG_SET_SLICE(isp_ctrl, MRV_ISP_DIGITAL_GAIN_EN, 1U);
-
-	isp_write_reg(dev, REG_ADDR(isp_dgain_rb), isp_dgain_rb);
-	isp_write_reg(dev, REG_ADDR(isp_dgain_g), isp_dgain_g);
-	isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl);
-	//isp_info("exit %s\n", __func__);
 	return 0;
 }
 
@@ -935,7 +931,8 @@ int isp_start_stream(struct isp_ic_dev *dev, u32 numFrames)
 	isp_imsc = isp_read_reg(dev, REG_ADDR(isp_imsc));
 	isp_imsc |=
 	    (MRV_ISP_IMSC_ISP_OFF_MASK | MRV_ISP_IMSC_FRAME_MASK |
-	     MRV_ISP_IMSC_FRAME_IN_MASK | MRV_ISP_IMSC_PIC_SIZE_ERR_MASK | MRV_ISP_IMSC_FLASH_ON_MASK);
+	     MRV_ISP_IMSC_FRAME_IN_MASK | MRV_ISP_IMSC_PIC_SIZE_ERR_MASK | MRV_ISP_IMSC_FLASH_ON_MASK |
+		 MRV_ISP_IMSC_DATA_LOSS_MASK);
 	/* isp_imsc |= (MRV_ISP_IMSC_FRAME_MASK | MRV_ISP_IMSC_DATA_LOSS_MASK | MRV_ISP_IMSC_FRAME_IN_MASK); */
 	isp_write_reg(dev, REG_ADDR(isp_icr), 0xFFFFFFFF);
 	isp_write_reg(dev, REG_ADDR(isp_imsc), isp_imsc);
@@ -1191,7 +1188,7 @@ int isp_ioc_read_mis(struct isp_ic_dev *dev, void __user *args)
 {
 	isp_mis_list_t* pCList = &dev->circle_list;
 	isp_mis_t mis_data;
-	u32 ary[2];
+	u64 ary[2];
 	int ret = -1;
 	ret = isp_irq_read_circle_queue(&mis_data, pCList);
 	if (ret < 0) {
@@ -1331,9 +1328,9 @@ int isp_s_hdrexp(struct isp_ic_dev *dev)
 	u32 isp_hdr_exp_conf = isp_read_reg(dev, REG_ADDR(isp_hdr_exp_conf));
 	u32 isp_stitching_imsc = isp_read_reg(dev, REG_ADDR(isp_stitching_imsc));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!dev->hdrexp.enable) {
-        pr_info("%s, hdr disabled\n",__func__);
+        isp_info("%s, hdr disabled\n",__func__);
 		REG_SET_SLICE(isp_hdr_exp_conf, MRV_HDR_EXP_START, 0);
 		isp_write_reg(dev, REG_ADDR(isp_hdr_exp_conf), isp_hdr_exp_conf);
 		isp_write_reg(dev, REG_ADDR(isp_stitching_imsc), isp_stitching_imsc & ~0x38);
@@ -1375,7 +1372,7 @@ int isp_g_hdrexpmean(struct isp_ic_dev *dev, u8 * mean)
 {
 	int i = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!dev || !mean)
 		return -EINVAL;
 	for (; i < 75; i++) {
@@ -1483,9 +1480,9 @@ int isp_s_hdrhist(struct isp_ic_dev *dev)
 	u32 isp_hdr_hist_prop = isp_read_reg(dev, REG_ADDR(isp_hdr_hist_prop));
 	u32 isp_stitching_imsc = isp_read_reg(dev, REG_ADDR(isp_stitching_imsc));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!dev->hdrhist.enable) {
-		pr_info("%s, hdr disable\n", __func__);
+		isp_info("%s, hdr disable\n", __func__);
 		REG_SET_SLICE(isp_hdr_hist_prop, MRV_HIST_MODE, MRV_HIST_MODE_NONE);
 		isp_write_reg(dev, REG_ADDR(isp_hdr_hist_prop), isp_hdr_hist_prop);
 		isp_write_reg(dev, REG_ADDR(isp_stitching_imsc),
@@ -1533,7 +1530,7 @@ int isp_g_hdrhistmean(struct isp_ic_dev *dev, u32 * mean)
 {
 	int i = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!dev || !mean)
 		return -EINVAL;
 
@@ -1547,7 +1544,7 @@ int isp_g_hdrhistmean(struct isp_ic_dev *dev, u32 * mean)
 int isp_s_hist64(struct isp_ic_dev *dev)
 {
 #ifndef ISP_HIST64
-	//pr_err("Not supported hist64 module\n");
+	//isp_err("Not supported hist64 module\n");
 	return -1;
 #else
 	struct isp_hist64_context *hist64 = &dev->hist64;
@@ -1625,7 +1622,7 @@ int isp_s_hist64(struct isp_ic_dev *dev)
 int isp_g_hist64mean(struct isp_ic_dev *dev, u32 *mean)
 {
 #ifndef ISP_HIST64
-	//pr_err("Not supported hist64 module\n");
+	//isp_err("Not supported hist64 module\n");
 	return -1;
 #else
 	int i = 0;
@@ -1647,7 +1644,7 @@ int isp_g_hist64mean(struct isp_ic_dev *dev, u32 *mean)
 int isp_g_hist64_vstart_status(struct isp_ic_dev *dev, u32 *status)
 {
 #ifndef ISP_HIST64
-	//pr_err("Not supported hist64 module\n");
+	//isp_err("Not supported hist64 module\n");
 	return -1;
 #else
 
@@ -1664,7 +1661,7 @@ int isp_g_hist64_vstart_status(struct isp_ic_dev *dev, u32 *status)
 int isp_update_hist64(struct isp_ic_dev *dev)
 {
 #ifndef ISP_HIST64
-	//pr_err("Not supported hist64\n");
+	//isp_err("Not supported hist64\n");
 	return -1;
 #else
 	struct isp_hist64_context* hist64 =&dev->hist64;
@@ -2175,7 +2172,6 @@ int isp_s_afm(struct isp_ic_dev *dev)
 	u32 isp_afm_ctrl = isp_read_reg(dev, REG_ADDR(isp_afm_ctrl));
 	u32 isp_imsc = isp_read_reg(dev, REG_ADDR(isp_imsc));
 
-	isp_info("enter %s\n", __func__);
 
 	if (!afm->enable) {
 		REG_SET_SLICE(isp_afm_ctrl, MRV_AFM_AFM_EN, 0);
@@ -2202,27 +2198,26 @@ int isp_s_afm(struct isp_ic_dev *dev)
 	isp_imsc |= mask;
 	isp_write_reg(dev, REG_ADDR(isp_afm_ctrl), isp_afm_ctrl);
 	isp_write_reg(dev, REG_ADDR(isp_imsc), isp_imsc);
-	isp_info("exit %s\n", __func__);
+
 	return 0;
 }
 
 int isp_g_afm(struct isp_ic_dev *dev, struct isp_afm_result *afm)
 {
-	isp_debug("enter %s\n", __func__);
 	afm->sum_a = isp_read_reg(dev, REG_ADDR(isp_afm_sum_a));
 	afm->sum_b = isp_read_reg(dev, REG_ADDR(isp_afm_sum_b));
 	afm->sum_c = isp_read_reg(dev, REG_ADDR(isp_afm_sum_c));
 	afm->lum_a = isp_read_reg(dev, REG_ADDR(isp_afm_lum_a));
 	afm->lum_b = isp_read_reg(dev, REG_ADDR(isp_afm_lum_b));
 	afm->lum_c = isp_read_reg(dev, REG_ADDR(isp_afm_lum_c));
-	isp_debug("exit %s\n", __func__);
+
 	return 0;
 }
 
 int isp_s_exp2_inputsel(struct isp_ic_dev *dev)
 {
 #ifndef ISP_AEV2
-	pr_err("unsupported function: %s\n", __func__);
+	isp_err("unsupported function: %s\n", __func__);
 	return -EINVAL;
 #else
 	struct isp_exp2_context *exp2 = &dev->exp2;
@@ -2236,7 +2231,7 @@ int isp_s_exp2_inputsel(struct isp_ic_dev *dev)
 int isp_s_exp2_sizeratio(struct isp_ic_dev *dev, u32 h_size)
 {
 #ifndef ISP_AEV2
-	pr_err("unsupported function: %s\n", __func__);
+	isp_err("unsupported function: %s\n", __func__);
 	return -EINVAL;
 #else
 	u32 size_inv;
@@ -2838,17 +2833,17 @@ long isp_priv_ioctl(struct isp_ic_dev *dev, unsigned int cmd, void __user *args)
 	if (!dev) {
 		return ret;
 	}
-	/*pr_info("[%s:%d]cmd 0x%08x\n", __func__, __LINE__, cmd);*/
+	/*isp_info("[%s:%d]cmd 0x%08x\n", __func__, __LINE__, cmd);*/
 	switch (cmd) {
 	case ISPIOC_RESET:
 		if((ret = isp_mi_stop(dev)) != 0 )
 		{
-			pr_err("[%s:%d]stop mi error before resetting!\n", __func__, __LINE__);
+			isp_err("[%s:%d]stop mi error before resetting!\n", __func__, __LINE__);
 			break;
 		}
 		if((ret = isp_stop_stream(dev)) != 0)
 		{
-			pr_err("[%s:%d]stop isp stream before resetting!\n", __func__, __LINE__);
+			isp_err("[%s:%d]stop isp stream before resetting!\n", __func__, __LINE__);
 			break;
 		}
 		ret = isp_reset(dev);
@@ -3491,12 +3486,13 @@ long isp_priv_ioctl(struct isp_ic_dev *dev, unsigned int cmd, void __user *args)
 						 (data, args,
 						  sizeof(struct
 							 isp_rgbgamma_data)));
-				ret = isp_s_rgbgamma(dev, data);
-#ifdef __KERNEL__
-				kfree(data);
-#else
-				free(data);
-#endif
+				dev->rgbgamma.data = data;
+				ret = isp_s_rgbgamma(dev);
+//#ifdef __KERNEL__
+//				kfree(data);
+//#else
+//				free(data);
+//#endif
 			}
 			break;
 		}
@@ -3671,7 +3667,7 @@ long isp_priv_ioctl(struct isp_ic_dev *dev, unsigned int cmd, void __user *args)
     case ISPIOC_GET_FRAME_MASK_INFO_ADDR: {
         unsigned long addr;
         addr = dev->frame_mark_info_addr;
-        pr_info("ISPIOC_GET_FRAME_MASK_INFO_ADDR %lx\n", addr);
+        isp_info("ISPIOC_GET_FRAME_MASK_INFO_ADDR %lx\n", addr);
         viv_check_retval(copy_to_user(args, &addr, sizeof(addr)));
         ret = 0;
     }

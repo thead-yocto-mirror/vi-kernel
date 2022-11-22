@@ -1,4 +1,7 @@
 /*
+ * @Description: 
+ */
+/*
  * Copyright (C) 2021 Alibaba Group Holding Limited
  * Author: liuyitong <yitong.lyt@alibaba-inc.com>
  *
@@ -17,6 +20,13 @@ enum {
     VIDEO_GET_DEV_PARAM,
     VIDEO_SET_PATH_TYPE,
     VIDEO_GET_MEM_POOL_REGION_ID,
+    VIDEO_SET_DEVICE_STATE,
+    VIDEO_GET_DEVICE_STATE,
 };
 
+
+enum {
+    DEVICE_OPERATION_ACTIVE,
+    DEVICE_OPERATION_DEACTIVE,
+};
 #endif /* _THEAD_VIDEO_IOCTL_H_*/

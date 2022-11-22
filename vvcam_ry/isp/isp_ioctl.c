@@ -63,16 +63,7 @@
 #include <linux/regmap.h>
 #include <linux/of_reserved_mem.h>
 #endif
-
-#ifdef CONFIG_VSI_ISP_DEBUG
-#define isp_info(fmt, ...)	pr_info(fmt, ##__VA_ARGS__)
-#define isp_debug(fmt, ...)  pr_debug(fmt, ##__VA_ARGS__)
-#define isp_err(fmt, ...)  pr_err(fmt, ##__VA_ARGS__)
-#else
-#define isp_info(fmt, ...)
-#define isp_debug(fmt, ...)
-#define isp_err(fmt, ...)  pr_err(fmt, ##__VA_ARGS__)
-#endif
+#include "isp_ioctl.h"
 
 volatile MrvAllRegister_t *all_regs = NULL;
 
@@ -87,7 +78,7 @@ void isp_ic_set_hal(HalHandle_t hal)
 
 void isp_write_reg(struct isp_ic_dev *dev, u32 offset, u32 val)
 {
-	//pr_info("%s addr 0x%08x val 0x%08x\n", __func__, offset, val);
+	//isp_info("%s addr 0x%08x val 0x%08x\n", __func__, offset, val);
 	if (offset >= ISP_REG_SIZE)
 		return;
 	HalWriteReg(hal_handle, offset, val);
@@ -935,7 +926,8 @@ int isp_start_stream(struct isp_ic_dev *dev, u32 numFrames)
 	isp_imsc = isp_read_reg(dev, REG_ADDR(isp_imsc));
 	isp_imsc |=
 	    (MRV_ISP_IMSC_ISP_OFF_MASK | MRV_ISP_IMSC_FRAME_MASK |
-	     MRV_ISP_IMSC_FRAME_IN_MASK | MRV_ISP_IMSC_PIC_SIZE_ERR_MASK | MRV_ISP_IMSC_FLASH_ON_MASK | MRV_ISP_IMSC_FLASH_OFF_MASK);
+	     MRV_ISP_IMSC_FRAME_IN_MASK | MRV_ISP_IMSC_PIC_SIZE_ERR_MASK | MRV_ISP_IMSC_FLASH_ON_MASK | MRV_ISP_IMSC_FLASH_OFF_MASK |
+		 MRV_ISP_IMSC_DATA_LOSS_MASK | MRV_ISP_IMSC_SHUTTER_OFF_MASK | MRV_ISP_MIS_VSM_END_MASK);
 	/* isp_imsc |= (MRV_ISP_IMSC_FRAME_MASK | MRV_ISP_IMSC_DATA_LOSS_MASK | MRV_ISP_IMSC_FRAME_IN_MASK); */
 	isp_write_reg(dev, REG_ADDR(isp_icr), 0xFFFFFFFF);
 	isp_write_reg(dev, REG_ADDR(isp_imsc), isp_imsc);
@@ -1190,7 +1182,7 @@ int isp_ioc_read_mis(struct isp_ic_dev *dev, void __user *args)
 {
 	isp_mis_list_t* pCList = &dev->circle_list;
 	isp_mis_t mis_data;
-	u32 ary[2];
+	u64 ary[2];
 	int ret = -1;
 	ret = isp_irq_read_circle_queue(&mis_data, pCList);
 	if (ret < 0) {
@@ -1198,7 +1190,8 @@ int isp_ioc_read_mis(struct isp_ic_dev *dev, void __user *args)
 		return ret;
 	}
 
-    /*isp_info("%s  irq src %d val 0x%08x\n", __func__, mis_data.irq_src, mis_data.val);*/
+    /*isp_info("%s  irq src %d val 0x%lx\n", __func__, mis_data.irq_src, mis_data.val);*/
+
 	ary[0] = mis_data.irq_src;
 	ary[1] = mis_data.val;
 	viv_check_retval(copy_to_user(args, ary, sizeof( ary)));
@@ -1330,9 +1323,9 @@ int isp_s_hdrexp(struct isp_ic_dev *dev)
 	u32 isp_hdr_exp_conf = isp_read_reg(dev, REG_ADDR(isp_hdr_exp_conf));
 	u32 isp_stitching_imsc = isp_read_reg(dev, REG_ADDR(isp_stitching_imsc));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!dev->hdrexp.enable) {
-        pr_info("%s, hdr disabled\n",__func__);
+        isp_info("%s, hdr disabled\n",__func__);
 		REG_SET_SLICE(isp_hdr_exp_conf, MRV_HDR_EXP_START, 0);
 		isp_write_reg(dev, REG_ADDR(isp_hdr_exp_conf), isp_hdr_exp_conf);
 		isp_write_reg(dev, REG_ADDR(isp_stitching_imsc), isp_stitching_imsc & ~0x38);
@@ -1374,7 +1367,7 @@ int isp_g_hdrexpmean(struct isp_ic_dev *dev, u8 * mean)
 {
 	int i = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!dev || !mean)
 		return -EINVAL;
 	for (; i < 75; i++) {
@@ -1482,9 +1475,9 @@ int isp_s_hdrhist(struct isp_ic_dev *dev)
 	u32 isp_hdr_hist_prop = isp_read_reg(dev, REG_ADDR(isp_hdr_hist_prop));
 	u32 isp_stitching_imsc = isp_read_reg(dev, REG_ADDR(isp_stitching_imsc));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!dev->hdrhist.enable) {
-		pr_info("%s, hdr disable\n", __func__);
+		isp_info("%s, hdr disable\n", __func__);
 		REG_SET_SLICE(isp_hdr_hist_prop, MRV_HIST_MODE, MRV_HIST_MODE_NONE);
 		isp_write_reg(dev, REG_ADDR(isp_hdr_hist_prop), isp_hdr_hist_prop);
 		isp_write_reg(dev, REG_ADDR(isp_stitching_imsc),
@@ -1532,7 +1525,7 @@ int isp_g_hdrhistmean(struct isp_ic_dev *dev, u32 * mean)
 {
 	int i = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!dev || !mean)
 		return -EINVAL;
 
@@ -2813,7 +2806,7 @@ long isp_priv_ioctl(struct isp_ic_dev *dev, unsigned int cmd, void __user *args)
 	if (!dev) {
 		return ret;
 	}
-	/*pr_info("ry [%s:%d]cmd 0x%08x\n", __func__, __LINE__, cmd);*/
+	/*isp_info("ry [%s:%d]cmd 0x%08x\n", __func__, __LINE__, cmd);*/
 	switch (cmd) {
 	case ISPIOC_RESET:
 		if((ret = isp_mi_stop(dev)) != 0 )

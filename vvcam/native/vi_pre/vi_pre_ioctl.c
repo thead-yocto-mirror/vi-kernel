@@ -7,6 +7,7 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/poll.h>
 #include <linux/regmap.h>
 #include <linux/of_reserved_mem.h>
 #include <linux/io.h>
@@ -637,12 +638,6 @@ void vi_pre_interrupt_handler(struct vi_pre_dev *dev)
 }
 #endif
 
-typedef struct {
-    int glue_idx;
-    int h;
-    int v;
-} vipre_resolution_cfg_t;
-
 int vi_pre_set_resolution(struct vi_pre_dev *dev, void *arg)
 {
     u32 val = 0;
@@ -899,7 +894,57 @@ int vi_pre_disable_ipi(struct vi_pre_dev *dev, void *arg)
 extern int vi_pre_dma_config(struct vi_pre_dev *pdriver_dev, void *arg);
 extern int vi_pre_dma_start(struct vi_pre_dev *pdriver_dev);
 extern int vi_pre_dma_stop(struct vi_pre_dev *pdriver_dev);
+extern int vi_pre_dma_mframe_set_buf(struct vi_pre_dev *pdriver_dev, void *arg);
+extern int vi_pre_dma_get_mframe_done_id(struct vi_pre_dev *pdriver_dev, void *arg);
+extern int vi_pre_dma_mframe_update_buf(struct vi_pre_dev *pdriver_dev, void *arg);
 
+static DECLARE_WAIT_QUEUE_HEAD(vipre_waitq);
+static irqreturn_t vi_pre_irq(int irq, void *dev_id)
+{
+    extern void vi_pre_dma_interrupt_handler(struct vi_pre_dev *pdriver_dev);
+	struct vi_pre_dev *pdriver_dev = dev_id;
+    vi_pre_dma_interrupt_handler(pdriver_dev);
+    wake_up_interruptible(&vipre_waitq);
+
+    return IRQ_HANDLED;
+}
+
+unsigned vi_pre_poll(struct file *file, poll_table *wait)
+{
+    extern int *vi_pre_event(void);
+    int *event = 0;
+    unsigned int mask = 0;
+    event = vi_pre_event();
+    poll_wait(file, &vipre_waitq, wait);
+
+    if (*event) {
+        mask |= POLLIN | POLLRDNORM;
+        *event = 0;
+    }
+
+    return mask;
+}
+
+static int vi_pre_request_irq(struct vi_pre_dev *pdriver_dev, void *arg)
+{
+    int ret = 0;
+    struct device *dev = &pdriver_dev->pdev->dev;
+
+    ret = devm_request_irq(dev, pdriver_dev->irq,
+                               vi_pre_irq, IRQF_SHARED,
+                               dev_name(dev), pdriver_dev);
+    if (ret) {
+        dev_err(dev, "irq vipre failed\n");
+    }
+
+    return ret;
+}
+
+static int vi_pre_free_irq(struct vi_pre_dev *pdriver_dev, void *arg)
+{
+	int ret = free_irq(pdriver_dev->irq, pdriver_dev);
+    return ret;
+}
 
 unsigned int vi_pre_priv_ioctl(struct vi_pre_dev *dev, unsigned int cmd, void *args)
 {
@@ -975,6 +1020,21 @@ unsigned int vi_pre_priv_ioctl(struct vi_pre_dev *dev, unsigned int cmd, void *a
 	case VI_PRE_IOCTL_PRESS_INTERROR:
         ret = vi_pre_press_interror(dev, args);
 		break;
+	case VI_PRE_IOCTL_SET_MFRAME_BUF:
+        ret = vi_pre_dma_mframe_set_buf(dev, args);
+		break;
+	case VI_PRE_IOCTL_GET_MFRAME_DONE_ID:
+        ret = vi_pre_dma_get_mframe_done_id(dev, args);
+        break;
+	case VI_PRE_IOCTL_MFRAME_UPDATE_BUF:
+        ret = vi_pre_dma_mframe_update_buf(dev, args);
+        break;
+    case VI_PRE_IOCTL_REQUEST_IRQ:
+        ret = vi_pre_request_irq(dev, args);
+        break;
+    case VI_PRE_IOCTL_FREE_IRQ:
+        ret = vi_pre_free_irq(dev, args);
+        break;
 	default:
 		pr_err("unsupported command %d\n", cmd);
 		break;

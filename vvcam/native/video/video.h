@@ -1,3 +1,4 @@
+
 #ifndef _THEAD_VIDEO_H_
 #define _THEAD_VIDEO_H_
 
@@ -30,10 +31,13 @@ typedef struct {
 
 typedef struct video_drvdata {
 	struct cdev cdev;
+    struct device *dev;
 	dev_t devt;
 	struct class *class;
 	int device_idx;
 	struct mutex mutex;
+    bool actived;
+    pid_t actived_owner;
 	int pipline_num;
 	pipline_t piplines[20];
 	int vi_mem_pool_region_id;

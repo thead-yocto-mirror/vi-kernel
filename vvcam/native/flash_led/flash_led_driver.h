@@ -1,3 +1,6 @@
+/*
+ * @Description: 
+ */
 #ifndef _FLASH_LED_DRIVER_H_
 #define _FLASH_LED_DRIVER_H_
 
@@ -75,6 +78,7 @@ struct flash_led_ctrl {
     struct flash_led_dev projection;
     dma_addr_t frame_mark_info_addr;
     volatile frame_mark_t *frame_mark;
+    flash_led_switch_mod_t  switch_mode;
 };
 
 int flash_led_init(struct flash_led_ctrl *dev);
@@ -82,5 +86,5 @@ int flash_led_deinit(struct flash_led_ctrl *dev);
 long flash_led_priv_ioctl(struct flash_led_ctrl *dev, unsigned int cmd, void __user *args);
 int32_t flash_led_i2c_write(struct flash_led_dev *dev, uint32_t address, uint32_t data);
 int32_t flash_led_i2c_read(struct flash_led_dev *dev, uint32_t address, uint32_t *pdata);
-
+int flash_led_switch(struct flash_led_ctrl *pflash_led_dev ,uint64_t frame_id);
 #endif

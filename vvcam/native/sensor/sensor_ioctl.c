@@ -171,6 +171,7 @@ static int vvcam_i2c_read_reg(struct i2c_client *client,unsigned int slave_addre
 int32_t vvcam_sensor_i2c_write(struct vvcam_sensor_dev *dev, uint32_t address, uint32_t data)
 {
 	int32_t ret = 0;
+    int cnt = 10;
 	struct vvcam_sccb_data;
 
 	if((NULL == dev))
@@ -178,9 +179,23 @@ int32_t vvcam_sensor_i2c_write(struct vvcam_sensor_dev *dev, uint32_t address, u
 		return -1;
 	}
 
-	ret = vvcam_i2c_write_reg(dev->i2c_client,dev->sensor_sccb_cfg.slave_addr,
+
+    while(cnt > 0) {
+	    ret = vvcam_i2c_write_reg(dev->i2c_client,dev->sensor_sccb_cfg.slave_addr,
 	                         address,dev->sensor_sccb_cfg.addr_byte,
 	                         data,dev->sensor_sccb_cfg.data_byte);
+        if(ret == 0) {
+            break;
+        }
+        mdelay(10);
+        cnt--;
+    }
+
+    if (ret != 0) {
+        dev->err_mask = 1;
+        wake_up(&dev->err_wait);
+        pr_warn("warn: sensor %s i2c write failed\n", dev->sensor_name);
+    }
 
 	return ret;
 }
@@ -188,6 +203,7 @@ int32_t vvcam_sensor_i2c_write(struct vvcam_sensor_dev *dev, uint32_t address, u
 int32_t vvcam_sensor_i2c_read(struct vvcam_sensor_dev *dev, uint32_t address, uint32_t *pdata)
 {
 	int32_t ret = 0;
+    int cnt = 10;
 	struct vvcam_sccb_data;
 
 	if((NULL == dev))
@@ -195,9 +211,22 @@ int32_t vvcam_sensor_i2c_read(struct vvcam_sensor_dev *dev, uint32_t address, ui
 		return -1;
 	}
 
-	ret = vvcam_i2c_read_reg(dev->i2c_client,dev->sensor_sccb_cfg.slave_addr,
-	                         address, dev->sensor_sccb_cfg.addr_byte,
-	                         (unsigned char *)pdata, dev->sensor_sccb_cfg.data_byte);
+    while(cnt > 0) {
+	    ret = vvcam_i2c_read_reg(dev->i2c_client,dev->sensor_sccb_cfg.slave_addr,
+	            address, dev->sensor_sccb_cfg.addr_byte,
+	            (unsigned char *)pdata, dev->sensor_sccb_cfg.data_byte);
+        if(ret == 0) {
+            break;
+        }
+        mdelay(10);
+        cnt--;
+    }
+
+    if (ret != 0) {
+        dev->err_mask = 2;
+        wake_up(&dev->err_wait);
+        pr_warn("warn: sensor %s i2c read failed\n", dev->sensor_name);
+    }
 
 	return ret;
 }
@@ -235,7 +264,10 @@ static int32_t vvcam_sensor_i2c_write_array(struct vvcam_sensor_dev *dev, void _
 #endif
 
             if (ret != 0) {
-                printk("<0>""!!!!!!!write array error, sccb_data.addr: 0x%x, sccb_data.data: 0x%x\n", sccb_data.addr, sccb_data.data);
+                pr_err("sensor %s write array error, sccb_data.addr: 0x%x, sccb_data.data: 0x%x\n",\
+                        dev->sensor_name, sccb_data.addr, sccb_data.data);
+                dev->err_mask = 1;
+                wake_up(&dev->err_wait);
 			    return ret;
             }
 		}
@@ -317,7 +349,6 @@ long sensor_priv_ioctl(struct vvcam_sensor_dev *dev, unsigned int cmd, void __us
 		return ret;
 	}
 
-	//printk("-->%s: cmd = %d!\n", __func__,cmd);
 	switch (cmd)
 	{
 		case VVSENSORIOC_RESET:

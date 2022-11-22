@@ -180,6 +180,22 @@ static void vvnative_isp_work(struct work_struct *work)
        pisp_dev->gamma_out.changed);
        isp_s_gamma_out(pisp_dev);
     }
+	if (pisp_dev->rgbgamma.data_changed) {
+      //pr_info("%s pisp_dev->rgbgamma.data_changed %d\n", __func__,
+       //pisp_dev->rgbgamma.data_changed);		
+	   isp_s_rgbgamma(pisp_dev);
+	}
+	if (pisp_dev->rgbgamma.changed) {
+		//pr_info("%s pisp_dev->rgbgamma.changed %d\n", __func__,pisp_dev->rgbgamma.changed);		
+		if (pisp_dev->rgbgamma.enable) {
+			isp_enable_rgbgamma(pisp_dev);
+		} else {
+			isp_disable_rgbgamma(pisp_dev);
+		}
+	}
+	if (pisp_dev->dgain.changed) {
+		isp_s_digital_gain(pisp_dev);
+	}
 
   }
 
@@ -189,7 +205,54 @@ static irqreturn_t vvcam_isp_irq(int irq, void *dev_id)
 {
     struct vvcam_isp_driver_dev *pdriver_dev ;
     struct isp_ic_dev * pisp_dev;
-    u32 isp_mis, mi_mis, mi_mis_addr, mi_icr_addr;
+    u64 isp_mis, mi_mis = 0;
+
+    pdriver_dev = (struct vvcam_isp_driver_dev *)dev_id;
+    pisp_dev = pdriver_dev->private;
+    isp_mis = isp_read_reg(pisp_dev, REG_ADDR(isp_mis));
+
+    if (isp_mis & MRV_ISP_MIS_FLASH_ON_MASK) {
+        mi_mis |= 0x4;
+    }
+
+    volatile frame_mark_t *frame_mark = pdriver_dev->frame_mark;
+    if (isp_mis & MRV_ISP_MIS_FRAME_IN_MASK) {
+        frame_mark->frame_time_us = get_us_time();
+        frame_mark->frame_irq_cnt += 1;
+    }
+
+    if (mi_mis) {
+        isp_mis_t mis_data;
+        mis_data.irq_src = SRC_MI_IRQ;
+        mis_data.val = mi_mis;
+        isp_irq_write_circle_queue(&mis_data, &pisp_dev->circle_list);
+    }
+
+    if (isp_mis) {
+        isp_mis_t mis_data;
+        mis_data.irq_src = SRC_ISP_IRQ;
+        mis_data.val = isp_mis;
+        pisp_dev->isp_mis = isp_mis;
+        isp_irq_write_circle_queue(&mis_data, &pisp_dev->circle_list);
+        isp_write_reg(pisp_dev, REG_ADDR(isp_icr), isp_mis);
+        if(isp_mis & MRV_ISP_MIS_ISP_OFF_MASK) {
+            isp_write_reg(pisp_dev, REG_ADDR(isp_imsc), isp_read_reg(pisp_dev, REG_ADDR(isp_imsc))&(~MRV_ISP_MIS_ISP_OFF_MASK));
+        }
+    }
+
+    if (isp_mis != 0 ||mi_mis != 0 ) {
+        schedule_work(&pdriver_dev->vvnative_wq);
+    } else {
+    return IRQ_HANDLED; // return IRQ_NONE;
+    }
+    return IRQ_HANDLED;
+}
+
+static irqreturn_t vvcam_mi_irq(int irq, void *dev_id)
+{
+    struct vvcam_isp_driver_dev *pdriver_dev ;
+    struct isp_ic_dev * pisp_dev;
+    u32 mi_mis, mi_mis_addr, mi_icr_addr;
 #ifdef ISP_MIV2
     u32 miv2_mis1, miv2_mis3;
 #endif
@@ -198,7 +261,6 @@ static irqreturn_t vvcam_isp_irq(int irq, void *dev_id)
 #endif
     pdriver_dev = (struct vvcam_isp_driver_dev *)dev_id;
     pisp_dev = pdriver_dev->private;
-    isp_mis = isp_read_reg(pisp_dev, REG_ADDR(isp_mis));
 
 #ifdef ISP_MIV2
     mi_icr_addr = REG_ADDR(miv2_icr);
@@ -229,15 +291,6 @@ static irqreturn_t vvcam_isp_irq(int irq, void *dev_id)
     /*pr_info("%s isp mis 0x%08x, mi mis 0x%08x\n", __func__,  \
         isp_mis, mi_mis);*/
 #endif
-    if (isp_mis & MRV_ISP_MIS_FLASH_ON_MASK) {
-        mi_mis |= 0x4;
-    }
-
-    volatile frame_mark_t *frame_mark = pdriver_dev->frame_mark;
-    if (isp_mis & MRV_ISP_MIS_FRAME_IN_MASK) {
-        frame_mark->frame_time_us = get_us_time();
-        frame_mark->frame_irq_cnt += 1;
-    }
 
     if (mi_mis) {
         isp_mis_t mis_data;
@@ -267,26 +320,15 @@ static irqreturn_t vvcam_isp_irq(int irq, void *dev_id)
         isp_write_reg(pisp_dev, REG_ADDR(miv2_icr2), miv2_mis2);
     }
 #endif
-    if (isp_mis) {
-        isp_mis_t mis_data;
-        mis_data.irq_src = SRC_ISP_IRQ;
-        mis_data.val = isp_mis;
-        pisp_dev->isp_mis = isp_mis;
-        isp_irq_write_circle_queue(&mis_data, &pisp_dev->circle_list);
-        isp_write_reg(pisp_dev, REG_ADDR(isp_icr), isp_mis);
-        if(isp_mis & MRV_ISP_MIS_ISP_OFF_MASK) {
-            isp_write_reg(pisp_dev, REG_ADDR(isp_imsc), isp_read_reg(pisp_dev, REG_ADDR(isp_imsc))&(~MRV_ISP_MIS_ISP_OFF_MASK));
-        }
-    }
 
 #if defined(ISP_MI_PP_READ) || defined (ISP_3DNR_V3) || defined (ISP_MI_PP_WRITE) ||  defined (ISP_MI_HDR)
-    if (isp_mis != 0 ||mi_mis != 0 || miv2_mis2 != 0) {
+    if (mi_mis != 0 || miv2_mis2 != 0) {
 #else
-    if (isp_mis != 0 ||mi_mis != 0 ) {
+    if (mi_mis != 0 ) {
 #endif
         schedule_work(&pdriver_dev->vvnative_wq);
     } else {
-    return IRQ_HANDLED; // return IRQ_NONE;
+        return IRQ_HANDLED;
     }
     return IRQ_HANDLED;
 }
@@ -410,7 +452,7 @@ static int vvcam_isp_release(struct inode * inode, struct file * file)
 	struct vvcam_isp_driver_dev *pdriver_dev;
 	struct isp_ic_dev *pisp_dev;
 	if ((inode == NULL) || (file == NULL) ) {
-		printk("%s: %dx\n", __func__, __LINE__);
+		pr_info("%s: %dx\n", __func__, __LINE__);
 		return 0;
 	}
 
@@ -420,6 +462,13 @@ static int vvcam_isp_release(struct inode * inode, struct file * file)
 	pisp_dev = pdriver_dev->private;
 	pr_info("enter %s\n", __func__);
 	isp_irq_destroy_circle_queue(&(pisp_dev->circle_list));
+
+    if (pisp_dev->ut_addr != NULL) {
+        #define UT_USED_SIZE 0x01000000
+        dma_free_coherent(dev, UT_USED_SIZE,
+                          pisp_dev->ut_addr, pisp_dev->ut_phy_addr);
+        pisp_dev->ut_addr = NULL;
+    }
 
 	ret = pm_runtime_put_sync(dev);
 	if (ret) {
@@ -512,7 +561,7 @@ static int vvcam_isp_probe(struct platform_device *pdev)
         return -1;
     }
 
-    printk("isp_frame_mark_info_addr = 0x%lx\n", pisp_dev->frame_mark_info_addr);
+    pr_info("isp_frame_mark_info_addr = 0x%lx\n", pisp_dev->frame_mark_info_addr);
 
     memset(frame_mark, 0, sizeof(frame_mark_t));
     pdriver_dev->frame_mark = frame_mark;
@@ -545,7 +594,7 @@ static int vvcam_isp_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = devm_request_irq(&pdev->dev, pdriver_dev->irq_num[1], vvcam_isp_irq,
+	ret = devm_request_irq(&pdev->dev, pdriver_dev->irq_num[1], vvcam_mi_irq,
 		IRQF_TRIGGER_RISING, "MI_IRQ", (char *)pdriver_dev);
 	if (ret) {
 		pr_err("%s[%d]:request irq error!\n", __func__, __LINE__);
@@ -658,6 +707,7 @@ static int vvcam_isp_remove(struct platform_device *pdev)
         #define UT_USED_SIZE 0x01000000
         dma_free_coherent(&pdev->dev, UT_USED_SIZE,
                           pisp_dev->ut_addr, pisp_dev->ut_phy_addr);
+        pisp_dev->ut_addr =NULL;
     }
 
 	free_irq(pdriver_dev->irq_num[0], pdriver_dev);

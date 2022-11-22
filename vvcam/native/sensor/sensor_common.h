@@ -80,6 +80,7 @@ struct vvcam_sensor_driver_dev
 	dev_t devt;
 	struct class *class;
 	struct mutex vvmutex;
+    struct platform_device *pdev;
 	void *private;
 };
 
@@ -107,11 +108,13 @@ struct vvcam_sensor_function_s
 struct vvcam_sensor_regulators {
 	struct regulator *supply[VVCAM_SENSOR_MAX_REGULATORS];
 	const char *name[VVCAM_SENSOR_MAX_REGULATORS];
+	unsigned int voltage[VVCAM_SENSOR_MAX_REGULATORS];
 	unsigned int delay_us[VVCAM_SENSOR_MAX_REGULATORS];
 	int num;
 };
 
 struct vvcam_sensor_dev {
+	struct device* dev;
 	long phy_addr;
 	long reg_size;
 	void __iomem *base;
@@ -128,8 +131,13 @@ struct vvcam_sensor_dev {
     const char *sensor_name;
 	struct vvcam_sensor_regulators regulators;
 	int pdn_pin;
+	int pdn_pin_is_busy;
 	unsigned int pdn_delay_us;
 	int rst_pin;
+	int rst_pin_is_busy;
+
+    wait_queue_head_t err_wait;
+    int err_mask;
 };
 
 extern int32_t sensor_reset(void *dev);

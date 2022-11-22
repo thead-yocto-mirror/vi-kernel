@@ -39,14 +39,19 @@ struct vi_pre_reg_t {
 #define VI_PRE_IOCTL_PRESS_INTERROR         _IOWR(VIPER_IOCTL_MAGIC, 19, int)
 #define VI_PRE_IOCTL_HDRPRO_ENABLE          _IOWR(VIPER_IOCTL_MAGIC, 20, int)
 #define VI_PRE_IOCTL_HDRPRO_DISABLE         _IOWR(VIPER_IOCTL_MAGIC, 21, int)
-#define VI_PRE_IOCTL_MAX                    _IOWR(VIPER_IOCTL_MAGIC, 22, int)
+#define VI_PRE_IOCTL_SET_MFRAME_BUF         _IOWR(VIPER_IOCTL_MAGIC, 22, int)
+#define VI_PRE_IOCTL_GET_MFRAME_DONE_ID     _IOWR(VIPER_IOCTL_MAGIC, 23, int)
+#define VI_PRE_IOCTL_MFRAME_UPDATE_BUF      _IOWR(VIPER_IOCTL_MAGIC, 24, int)
+#define VI_PRE_IOCTL_REQUEST_IRQ            _IOWR(VIPER_IOCTL_MAGIC, 25, int)
+#define VI_PRE_IOCTL_FREE_IRQ               _IOWR(VIPER_IOCTL_MAGIC, 26, int)
+#define VI_PRE_IOCTL_MAX                    _IOWR(VIPER_IOCTL_MAGIC, 27, int)
 
 typedef enum {
-    ipi_mode_nomal = 0,
-    ipi_mode_hdr_2_frame,
-    ipi_mode_hdr_3_frame,
-    ipi_mode_sony_dol_hdr_2_frame,
-    ipi_mode_sony_dol_hdr_3_frame,
+    IPI_MODE_NOMAL = 0,
+    IPI_MODE_HDR_2_FRAME,
+    IPI_MODE_HDR_3_FRAME,
+    IPI_MODE_SONY_DOL_HDR_2_FRAME,
+    IPI_MODE_SONY_DOL_HDR_3_FRAME,
 } ipi_mode_t;
 
 typedef struct {
@@ -155,6 +160,58 @@ struct hdrpro_resolution {
 	unsigned int width;
 	unsigned int height;
 };
+
+typedef enum {
+    VI_PRE_RAW_6BIT,
+    VI_PRE_RAW_7BIT,
+    VI_PRE_RAW_8BIT,
+    VI_PRE_RAW_10BIT_16ALIGN,
+    VI_PRE_RAW_12BIT,
+    VI_PRE_RAW_10BIT,
+} vi_pre_data_width_t;
+
+typedef enum {
+    VI_PRE_M_FRAME,
+    VI_PRE_N_LANE,
+} vi_pre_dma_mode_t;
+
+typedef struct {
+    int vc_num;         //1~3
+    vi_pre_data_width_t width;
+    vi_pre_dma_mode_t mode;
+    unsigned int resolution_h;
+    unsigned int resolution_v;
+    unsigned int line_size; //Data size of one line, unit byte; Must be 256-byte aligned
+    unsigned int num;       //n line num, or m frame num(m frme max is 4)
+    unsigned int n_line_int;//only used for nline mode.(Generate an interrupt every time when n lines are completed). n_line_int <= num
+    unsigned int buf_size;
+    unsigned char *buf;
+} vi_pre_dma_cfg_t;
+
+typedef struct {
+    int glue_idx;
+    int h;
+    int v;
+} vipre_resolution_cfg_t;
+
+typedef struct {
+    int frame_id;
+    int vc_num;
+    void *buf_addr;
+    int frame_size;
+} vi_pre_mframe_cfg_t;
+
+typedef struct {
+    int frame_id;
+    int vc_id;
+    void *buf_addr;
+    int frame_size;
+} vi_pre_mframe_update_t;
+
+typedef struct {
+    int update_frame_id;
+    int update_vc_id;
+} vi_pre_update_frame_info_t;
 
 extern unsigned int vi_pre_priv_ioctl(struct vi_pre_dev *dev, unsigned int cmd, void *args);
 

@@ -216,20 +216,21 @@ enum {
 	uint32_t isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));       \
 	REG_SET_SLICE(isp_ctrl, MRV_ISP_ISP_GEN_CFG_UPD, 1);			\
 	isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl);               \
-	}	
+	}
 
 #define CONFIG_VSI_ISP_DEBUG 1
 #ifdef CONFIG_VSI_ISP_DEBUG
-#define isp_info(fmt, ...)  pr_info(fmt, ##__VA_ARGS__)
-#define isp_debug(fmt, ...)  pr_debug(fmt, ##__VA_ARGS__)
-#define isp_err(fmt, ...)  pr_err(fmt, ##__VA_ARGS__)
+#define isp_info(fmt, ...) printk(KERN_DEBUG   pr_fmt(fmt), ##__VA_ARGS__)
+#define isp_debug(fmt, ...) printk(KERN_DEBUG   pr_fmt(fmt), ##__VA_ARGS__)
+#define isp_warn(fmt, ...) printk(KERN_WARNING pr_fmt(fmt), ##__VA_ARGS__)
+#define isp_err(fmt, ...)  printk(KERN_ERR     pr_fmt(fmt), ##__VA_ARGS__)
 #else
 #define isp_info(fmt, ...)
 #define isp_debug(fmt, ...)
 #define isp_err(fmt, ...)  pr_err(fmt, ##__VA_ARGS__)
 #endif
 
-#define ISP_REG_GAP 4												        
+#define ISP_REG_GAP 4
 long isp_priv_ioctl(struct isp_ic_dev *dev, unsigned int cmd, void __user *args);
 long isp_copy_data(void *dst, void *src, int size);
 

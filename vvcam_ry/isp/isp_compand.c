@@ -72,7 +72,7 @@ int isp_s_comp(struct isp_ic_dev *dev)
 	uint32_t y_data;
 	u32 isp_compand_ctrl = isp_read_reg(dev, REG_ADDR(isp_compand_ctrl));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (comp->bls.enable) {
 		isp_write_reg(dev, REG_ADDR(isp_compand_bls_a_fixed), comp->bls.a << (20 - comp->bls.bit_width));
 		isp_write_reg(dev, REG_ADDR(isp_compand_bls_b_fixed), comp->bls.b << (20 - comp->bls.bit_width));
@@ -98,9 +98,9 @@ int isp_s_comp(struct isp_ic_dev *dev)
 			    ((comp->expand.px[ri * 6 + 5] + (20-comp->expand.in_bit)) << 25);
 			isp_write_reg(dev, REG_ADDR(isp_compand_expand_px_0) + ri * 4, valr);
 		}
-		valr = ( comp->expand.px[60] + (20-comp->expand.in_bit)) | 
-		       ((comp->expand.px[61] + (20-comp->expand.in_bit)) << 5) | 
-		       ((comp->expand.px[62] + (20-comp->expand.in_bit)) << 10) | 
+		valr = ( comp->expand.px[60] + (20-comp->expand.in_bit)) |
+		       ((comp->expand.px[61] + (20-comp->expand.in_bit)) << 5) |
+		       ((comp->expand.px[62] + (20-comp->expand.in_bit)) << 10) |
 		       ((comp->expand.px[63] + (20-comp->expand.in_bit)) << 15);
 		isp_write_reg(dev, REG_ADDR(isp_compand_expand_px_10), valr);
 
@@ -109,13 +109,13 @@ int isp_s_comp(struct isp_ic_dev *dev)
 			x_data = (comp->expand.x_data[ri] << (20 - comp->expand.in_bit));
 			isp_write_reg(dev, REG_ADDR(isp_compand_expand_x_write_data), x_data);
 		}
-		
+
 		isp_write_reg(dev, REG_ADDR(isp_compand_expand_y_addr), 0x0);
 		for (ri = 0; ri < 64; ri++) {
 			y_data = (comp->expand.y_data[ri] << (20 - comp->expand.out_bit));
 			isp_write_reg(dev, REG_ADDR(isp_compand_expand_y_write_data), y_data);
 		}
-	
+
 	}
 
 	if (comp->compress.enable && comp->compress.update_curve) {
@@ -136,7 +136,7 @@ int isp_s_comp(struct isp_ic_dev *dev)
 			x_data = (comp->compress.x_data[ri] << (20 - comp->compress.in_bit));
 			isp_write_reg(dev, REG_ADDR(isp_compand_compress_x_write_data), x_data);
 		}
-		
+
 		isp_write_reg(dev, REG_ADDR(isp_compand_compress_y_addr), 0x0);
 		for (ri = 0; ri < 64; ri++) {
 			y_data = (comp->compress.y_data[ri] << (20 - comp->compress.out_bit));

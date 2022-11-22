@@ -93,9 +93,67 @@ static unsigned int devise_register_index = 0;
 extern int get_ntc_temperature(int mv);
 
 
+static irqreturn_t touch_pin_isr(int irq, void *dev);
+static int flash_pin_init(struct flash_led_ctrl *dev);
+static int touch_pin_uinit(struct flash_led_ctrl *dev);
+
+int flash_led_switch(struct flash_led_ctrl *pflash_led_dev ,uint64_t frame_id)
+{
+
+    struct flash_led_dev *floodlight = &pflash_led_dev->floodlight;
+    struct flash_led_dev *projection = &pflash_led_dev->projection;
+    bool floodlight_on =false;
+    bool projection_on =false;
+    switch(pflash_led_dev->switch_mode)
+    {
+        case  PROJECTION_EVEN_FLOODLIGHT_ODD:
+                    if(frame_id%2)
+                        projection_on = true;
+                    else
+                        floodlight_on =true;
+                    break;
+        case  PROJECTION_ODD_FLOODLIGHT_EVEN:
+                    if(frame_id%2)
+                        floodlight_on = true;
+                    else
+                        projection_on =true;
+                    break;
+        case  PROJECTION_ALWAYS_ON:
+                     projection_on = true;
+                     break;
+        case  FLOODLIGHT_ALWAYS_ON:
+                    floodlight_on =true;
+                    break;
+        case  BOTH_OFF:
+                break;
+        default:
+            pr_warn("invald switch mode:%d\n",pflash_led_dev->switch_mode);
+            return -1;
+    }
+
+    if(projection->flash_led_func)
+    {
+        if(projection_on ==true && (pflash_led_dev->enable & PROJECTION_EN))
+            projection->flash_led_func->enable_channel(projection, 3);
+        else
+             projection->flash_led_func->disable_channel(projection, 3);
+
+    }
+
+    if(floodlight->flash_led_func)
+    {
+        if(floodlight_on == true &&  (pflash_led_dev->enable & FLOODLIGHT_EN))
+            floodlight->flash_led_func->enable_channel(floodlight, 3);
+        else
+            floodlight->flash_led_func->disable_channel(floodlight, 3);
+    }
+    return 0;
+}
+
 static int flash_led_open(struct inode * inode, struct file * file)
 {
     int ret = 0;
+    int irq = 0;
 	struct flash_led_driver_dev *pdriver_dev;
 	struct flash_led_ctrl *pflash_led_dev;
 
@@ -106,6 +164,11 @@ static int flash_led_open(struct inode * inode, struct file * file)
 
     struct flash_led_dev *floodlight = &pflash_led_dev->floodlight;
     struct flash_led_dev *projection = &pflash_led_dev->projection;
+
+    irq = gpio_to_irq(pflash_led_dev->touch_pin);
+    request_irq(irq, touch_pin_isr, IRQF_TRIGGER_FALLING,
+                "flash led touch pin",
+                pflash_led_dev);
 
     if (floodlight->flash_led_func != NULL) {
         ret = floodlight->flash_led_func->init(floodlight);
@@ -121,6 +184,33 @@ static int flash_led_open(struct inode * inode, struct file * file)
 		    pr_err("%s, %d, projection init error\n", __func__, __LINE__);
             return ret;
         }
+
+    }
+
+	return 0;
+};
+
+static int flash_led_release(struct inode * inode, struct file * file)
+{
+    int irq = -1;
+	struct flash_led_driver_dev *pdriver_dev;
+	pdriver_dev = container_of(inode->i_cdev, struct flash_led_driver_dev, cdev);
+    struct flash_led_ctrl *pflash_led_dev = (struct flash_led_ctrl*)pdriver_dev->private;
+
+    struct flash_led_dev *floodlight = &pflash_led_dev->floodlight;
+    struct flash_led_dev *projection = &pflash_led_dev->projection;
+
+    irq = gpio_to_irq(pflash_led_dev->touch_pin);
+    free_irq(irq, pflash_led_dev);
+
+    pflash_led_dev->enable = 0;
+
+    if (projection->flash_led_func != NULL) {
+        projection->flash_led_func->disable_channel(projection, 3);
+    }
+
+    if (floodlight->flash_led_func != NULL) {
+        floodlight->flash_led_func->disable_channel(floodlight, 3);
     }
 
 	return 0;
@@ -145,29 +235,6 @@ static long flash_led_ioctl(struct file *file, unsigned int cmd, unsigned long a
 	mutex_unlock(&pdriver_dev->vvmutex);
 
 	return ret;
-};
-
-static int flash_led_release(struct inode * inode, struct file * file)
-{
-
-	struct flash_led_driver_dev *pdriver_dev;
-	pdriver_dev = container_of(inode->i_cdev, struct flash_led_driver_dev, cdev);
-    struct flash_led_ctrl *pflash_led_dev = (struct flash_led_ctrl*)pdriver_dev->private;
-
-    struct flash_led_dev *floodlight = &pflash_led_dev->floodlight;
-    struct flash_led_dev *projection = &pflash_led_dev->projection;
-
-    pflash_led_dev->enable = 0;
-
-    if (projection->flash_led_func != NULL) {
-        projection->flash_led_func->disable_channel(projection, 3);
-    }
-
-    if (floodlight->flash_led_func != NULL) {
-        floodlight->flash_led_func->disable_channel(floodlight, 3);
-    }
-
-	return 0;
 };
 
 struct file_operations flash_led_fops = {
@@ -355,10 +422,14 @@ static void flash_led_interrupt_func(struct work_struct *work)
     struct flash_led_dev *floodlight = &pflash_led_dev->floodlight;
     struct flash_led_dev *projection = &pflash_led_dev->projection;
     frame_mark_t *frame_mark = pflash_led_dev->frame_mark;
+    uint64_t frame_irq_cnt;
 
     frame_mark->frame_irq_cnt += 1;
-    falling_time_us[frame_mark->frame_irq_cnt % 2] = get_us_time();
-    frame_mark->frame_time_us = falling_time_us[frame_mark->frame_irq_cnt % 2];
+    frame_irq_cnt = frame_mark->frame_irq_cnt;
+
+    frame_mark->frame_time_us =  get_us_time();
+    falling_time_us[frame_irq_cnt % 2] =  frame_mark->frame_time_us;
+
 
     if (!pflash_led_dev->enable) {
         if (projection->flash_led_func != NULL) {
@@ -370,15 +441,9 @@ static void flash_led_interrupt_func(struct work_struct *work)
         }
         return;
     }
+    flash_led_switch(pflash_led_dev,frame_irq_cnt);
+    if ((frame_irq_cnt % 2) == 0) {
 
-    if ((frame_mark->frame_irq_cnt % 2) == 0) {
-        if ((pflash_led_dev->enable & FLOODLIGHT_EN) && floodlight->flash_led_func != NULL) {
-            floodlight->flash_led_func->enable_channel(floodlight, 3);
-        }
-
-        if ((pflash_led_dev->enable & PROJECTION_EN) && projection->flash_led_func != NULL) {
-            projection->flash_led_func->disable_channel(projection, 3);
-        }
         if (!IS_ERR(pflash_led_dev->floodlight_adc)) {
             iio_read_channel_processed(pflash_led_dev->floodlight_adc,
                                            &frame_mark->floodlight_temperature);
@@ -386,13 +451,6 @@ static void flash_led_interrupt_func(struct work_struct *work)
         }
 
     } else {
-        if ((pflash_led_dev->enable & PROJECTION_EN) && projection->flash_led_func != NULL) {
-            projection->flash_led_func->enable_channel(projection, 3);
-        }
-
-        if ((pflash_led_dev->enable & FLOODLIGHT_EN) && floodlight->flash_led_func != NULL) {
-            floodlight->flash_led_func->disable_channel(floodlight, 3);
-        }
 
         if (!IS_ERR(pflash_led_dev->projection_adc)) {
             iio_read_channel_processed(pflash_led_dev->projection_adc,
@@ -413,14 +471,9 @@ static irqreturn_t touch_pin_isr(int irq, void *dev)
 
 static int flash_pin_init(struct flash_led_ctrl *dev)
 {
-    int irq = gpio_to_irq(dev->touch_pin);
     gpio_request(dev->touch_pin, "flash led touch pin");
 
     INIT_WORK(&dev->flash_led_work, flash_led_interrupt_func);
-
-    request_irq(irq, touch_pin_isr, IRQF_TRIGGER_FALLING,
-                "flash led touch pin",
-                dev);
 
     if (dev->floodlight_en_pin != -1) {
         gpio_request(dev->floodlight_en_pin, "floodlight enable pin");
@@ -441,9 +494,7 @@ static int flash_pin_init(struct flash_led_ctrl *dev)
 
 static int touch_pin_uinit(struct flash_led_ctrl *dev)
 {
-    int irq = gpio_to_irq(dev->touch_pin);
     dev->enable = 0;
-    free_irq(irq, dev);
     cancel_work_sync(&dev->flash_led_work);
     gpio_free(dev->touch_pin);
     return 0;
@@ -511,7 +562,7 @@ static int flash_led_probe(struct platform_device *pdev)
 
 	ret = flash_led_init(pflash_led_dev);
 	if (ret != 0) {
-		pr_err("%s:vvnative_flash_led_init error\n", __func__);
+		pr_warn("%s:vvnative_flash_led_init error\n", __func__);
 	}
 
 	if (devise_register_index == 0) {
@@ -576,7 +627,6 @@ static int flash_led_remove(struct platform_device *pdev)
 	pflash_led_dev = pdriver_dev->private;
 	flash_led_deinit(pflash_led_dev);
     touch_pin_uinit(pflash_led_dev);
-
     dma_free_coherent(&pdev->dev, sizeof(*pflash_led_dev->frame_mark), pflash_led_dev->frame_mark, pflash_led_dev->frame_mark_info_addr);
 
     if (!IS_ERR(pflash_led_dev->projection_adc)) {

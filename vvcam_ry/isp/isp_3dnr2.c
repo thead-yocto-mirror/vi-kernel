@@ -201,7 +201,7 @@ int isp_s_3dnr(struct isp_ic_dev *dev)
 	u32 isp_denoise3d_strength, isp_denoise3d_motion, isp_denoise3d_delta_inv;
 	u32 isp_denoise3d_ctrl;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (dnr3->update_bin) {
 		dnr3_hw_init(dev);
     }
@@ -287,7 +287,7 @@ int isp_u_3dnr(struct isp_ic_dev *dev, struct isp_3dnr_update *dnr3_update)
 
 	u32 regVal = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	regVal = isp_read_reg(dev, REG_ADDR(isp_denoise3d_strength));
 	REG_SET_SLICE(regVal, DENOISE3D_STRENGTH, dev->dnr3.strength);
 	isp_write_reg(dev, REG_ADDR(isp_denoise3d_strength), regVal);

@@ -220,13 +220,14 @@ enum {
 
 #define CONFIG_VSI_ISP_DEBUG 1
 #ifdef CONFIG_VSI_ISP_DEBUG
-#define isp_info(fmt, ...)  pr_info(fmt, ##__VA_ARGS__)
-#define isp_debug(fmt, ...)  pr_debug(fmt, ##__VA_ARGS__)
-#define isp_err(fmt, ...)  pr_err(fmt, ##__VA_ARGS__)
+#define isp_info(fmt, ...) printk(KERN_DEBUG   pr_fmt(fmt), ##__VA_ARGS__)
+#define isp_debug(fmt, ...) printk(KERN_DEBUG   pr_fmt(fmt), ##__VA_ARGS__)
+#define isp_warn(fmt, ...) printk(KERN_WARNING pr_fmt(fmt), ##__VA_ARGS__)
+#define isp_err(fmt, ...)  printk(KERN_ERR     pr_fmt(fmt), ##__VA_ARGS__)
 #else
 #define isp_info(fmt, ...)
 #define isp_debug(fmt, ...)
-#define isp_err(fmt, ...)  pr_err(fmt, ##__VA_ARGS__)
+#define isp_err(fmt, ...)  printk(KERN_ERR     pr_fmt(fmt), ##__VA_ARGS__)
 #endif
 
 #define ISP_REG_GAP 4
@@ -317,7 +318,7 @@ int isp_s_hdr_bls(struct isp_ic_dev *dev);
 int isp_enable_hdr(struct isp_ic_dev *dev);
 int isp_disable_hdr(struct isp_ic_dev *dev);
 #ifdef ISP_2DNR_V5
-int isp_tdnr_s_2dnr(struct isp_ic_dev *dev);	
+int isp_tdnr_s_2dnr(struct isp_ic_dev *dev);
 #else
 int isp_s_2dnr(struct isp_ic_dev *dev);
 #endif
@@ -348,7 +349,7 @@ int isp_disable_gcmono(struct isp_ic_dev *dev);
 int isp_s_gcmono(struct isp_ic_dev *dev, struct isp_gcmono_data *data);	/* set curve */
 int isp_enable_rgbgamma(struct isp_ic_dev *dev);
 int isp_disable_rgbgamma(struct isp_ic_dev *dev);
-int isp_s_rgbgamma(struct isp_ic_dev *dev, struct isp_rgbgamma_data *data);
+int isp_s_rgbgamma(struct isp_ic_dev *dev);
 
 u32 isp_read_mi_irq(struct isp_ic_dev *dev);
 void isp_reset_mi_irq(struct isp_ic_dev *dev, u32 icr);

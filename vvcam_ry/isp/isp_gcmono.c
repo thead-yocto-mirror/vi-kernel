@@ -70,7 +70,7 @@ int isp_enable_gcmono(struct isp_ic_dev *dev)
 	u32 isp_gcmono_ctrl = isp_read_reg(dev, REG_ADDR(isp_gcmono_ctrl));
 	u32 isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	REG_SET_SLICE(isp_gcmono_ctrl, ISP_GCMONO_CFG_DONE, 1);
 	REG_SET_SLICE(isp_gcmono_ctrl, ISP_GCMONO_SWITCH,
 		      ISP_GCMONO_SWITCH_ENABLE);
@@ -92,7 +92,7 @@ int isp_disable_gcmono(struct isp_ic_dev *dev)
 	u32 isp_gcmono_ctrl = isp_read_reg(dev, REG_ADDR(isp_gcmono_ctrl));
 	u32 isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	REG_SET_SLICE(isp_gcmono_ctrl, ISP_GCMONO_SWITCH,
 		      ISP_GCMONO_SWITCH_DISABLE);
 	isp_write_reg(dev, REG_ADDR(isp_gcmono_ctrl), isp_gcmono_ctrl);
@@ -111,7 +111,7 @@ static int isp_s_gcmonopx(struct isp_ic_dev *dev, struct isp_gcmono_data *data)
 	int i;
 	u32 gc_px_data = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	p_table = (u32 *)&data->px;
 	for (i = 0; i < 64; i++) {
 		gc_px_data |= (*(p_table + i) << (i % 6 * 5));
@@ -133,7 +133,7 @@ static int isp_s_gcmonoWriteData(struct isp_ic_dev *dev, u32 *tblX, u32 *tblY)
 	int i;
 	// u32 gc_px_data = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	isp_write_reg(dev, REG_ADDR(isp_gcmono_y_addr), 0);
 	isp_write_reg(dev, REG_ADDR(isp_gcmono_x_addr), 0);
 	for (i = 0; i < 64; i++) {
@@ -161,7 +161,7 @@ int isp_s_gcmono(struct isp_ic_dev *dev, struct isp_gcmono_data *data)
 	u8 *p_table = NULL;
 	int i;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	REG_SET_SLICE(isp_gcmono_ctrl, ISP_GCMONO_SWITCH,
 		      ISP_GCMONO_SWITCH_DISABLE);
 	REG_SET_SLICE(isp_gcmono_ctrl, ISP_GCMONO_CFG_DONE,

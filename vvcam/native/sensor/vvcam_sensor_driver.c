@@ -65,6 +65,7 @@
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
 #include <linux/regulator/consumer.h>
+#include <linux/poll.h>
 
 #include "vvsensor.h"
 #include "sensor_common.h"
@@ -80,13 +81,37 @@ static unsigned int devise_register_index = 0;
 
 static int vvcam_sensor_open(struct inode * inode, struct file * file)
 {
+
+    int ret = 0;
 	struct vvcam_sensor_driver_dev *pdriver_dev;
+	struct vvcam_sensor_dev * psensor_dev;
 
 	pdriver_dev = container_of(inode->i_cdev, struct vvcam_sensor_driver_dev, cdev);
 	file->private_data = pdriver_dev;
+	psensor_dev = pdriver_dev->private;
+    pr_debug("%s, enter: vvcam%d \n", __func__, psensor_dev->device_idx);
 
+    if (gpio_is_valid(psensor_dev->rst_pin) && !psensor_dev->rst_pin_is_busy) {
+        ret = devm_gpio_request(&pdriver_dev->pdev->dev, psensor_dev->rst_pin, "sensor_rst");
+		if (ret < 0) {
+			pr_err("%s:sensor_rst request failed\n", __func__);
+		} else {
+            psensor_dev->rst_pin_is_busy++;
+        }
+    }
+
+	if (gpio_is_valid(psensor_dev->pdn_pin) && !psensor_dev->pdn_pin_is_busy) {
+        ret = devm_gpio_request(&pdriver_dev->pdev->dev, psensor_dev->pdn_pin, "sensor_pdn");
+		if (ret < 0) {
+			pr_err("%s:sensor_pdn request failed\n", __func__);
+		} else {
+            psensor_dev->pdn_pin_is_busy++;
+        }
+    }
+
+    pr_debug("%s, exit: vvcam%d \n", __func__, psensor_dev->device_idx);
 	return 0;
-};
+}
 
 static long vvcam_sensor_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -101,31 +126,81 @@ static long vvcam_sensor_ioctl(struct file *file, unsigned int cmd, unsigned lon
 		return  -ENOMEM;
 	}
 	psensor_dev = pdriver_dev->private;
-	//pr_info("%s:pdriver_dev =0x%px\n", __func__,pdriver_dev);
-	//pr_info("%s:sensor[%d] psensor_dev =0x%px\n", __func__,psensor_dev->device_idx,psensor_dev);
+	pr_debug("%s:sensor[%d], cmd %x\n", __func__, psensor_dev->device_idx, cmd);
 
 	mutex_lock(&pdriver_dev->vvmutex);
 	ret = sensor_priv_ioctl(psensor_dev, cmd ,(void __user *)arg);
 	mutex_unlock(&pdriver_dev->vvmutex);
 
 	return ret;
-};
+}
 
 static int vvcam_sensor_release(struct inode * inode, struct file * file)
 {
-	return 0;
-};
+	struct vvcam_sensor_driver_dev *pdriver_dev;
+	struct vvcam_sensor_dev * psensor_dev;
+
+	pdriver_dev = container_of(inode->i_cdev, struct vvcam_sensor_driver_dev, cdev);
+
+    if (pdriver_dev == NULL) {
+		pr_err("%s:file private is null point error\n", __func__);
+		return  -ENOMEM;
+	}
+	psensor_dev = pdriver_dev->private;
+
+    pr_debug("%s, enter: vvcam%d \n", __func__, psensor_dev->device_idx);
+
+    psensor_dev->rst_pin_is_busy--;
+    psensor_dev->pdn_pin_is_busy--;
+
+    if (gpio_is_valid(psensor_dev->rst_pin) &&  psensor_dev->rst_pin_is_busy == 0) {
+        gpio_free(psensor_dev->rst_pin);
+    }
+
+	if (gpio_is_valid(psensor_dev->pdn_pin) && psensor_dev->pdn_pin_is_busy == 0) {
+        gpio_free(psensor_dev->pdn_pin);
+    }
+
+
+    pr_debug("%s, exit: vvcam%d \n", __func__, psensor_dev->device_idx);
+    return 0;// sensor_reset(psensor_dev);
+}
+
+static unsigned vvcam_sensor_poll(struct file *file, poll_table *wait)
+{
+	long ret = 0;
+    unsigned int mask = 0;
+	struct vvcam_sensor_driver_dev *pdriver_dev;
+	struct vvcam_sensor_dev * psensor_dev;
+
+	pdriver_dev = file->private_data;
+	if (pdriver_dev == NULL)
+	{
+		pr_err("%s:file private is null point error\n", __func__);
+		return  -ENOMEM;
+	}
+	psensor_dev = pdriver_dev->private;
+    poll_wait(file, &psensor_dev->err_wait, wait);
+
+    if (psensor_dev->err_mask) {
+        mask |= POLLIN | POLLRDNORM;
+        psensor_dev->err_mask = 0;
+    }
+
+    return mask;
+}
 
 struct file_operations vvcam_sensor_fops = {
 	.owner = THIS_MODULE,
 	.open = vvcam_sensor_open,
 	.release = vvcam_sensor_release,
 	.unlocked_ioctl = vvcam_sensor_ioctl,
+    .poll = vvcam_sensor_poll,
 };
 
 static int vvcam_sensor_of_parse(struct platform_device *pdev)
 {
-	int ret = 0, regulator_num = 0;
+	int ret = 0, regulator_num = 0, voltage_set_num = 0;
 	struct device_node *np = pdev->dev.of_node;
 	struct vvcam_sensor_driver_dev *pdriver_dev = platform_get_drvdata(pdev);
 	struct vvcam_sensor_dev * psensor_dev = pdriver_dev->private;
@@ -135,6 +210,8 @@ static int vvcam_sensor_of_parse(struct platform_device *pdev)
 		pr_err("%s:property sensor_name not defined for %s\n", __func__, pdev->name);
 		return ret;
 	}
+
+	psensor_dev->dev = &pdev->dev;
 	psensor_dev->regulators.num = of_property_count_strings(np, "sensor_regulators");
 	if (psensor_dev->regulators.num <= 0) {
 		pr_err("%s:property sensor_regulators not defined for %s\n", __func__, pdev->name);
@@ -146,6 +223,16 @@ static int vvcam_sensor_of_parse(struct platform_device *pdev)
 			pr_err("%s:fail to read property sensor_regulators\n", __func__);
 			return -1;
 		};
+
+		voltage_set_num = of_property_count_u32_elems(np, "sensor_regulator_voltage_uV");
+		if(voltage_set_num == psensor_dev->regulators.num){
+			ret = of_property_read_u32_array(np, "sensor_regulator_voltage_uV",
+					psensor_dev->regulators.voltage, psensor_dev->regulators.num);
+			if (ret != 0) {
+				pr_err("%s:fail to read property sensor_regulator_voltage_uV\n", __func__);
+				return -1;
+			}
+		}
 		ret = of_property_read_u32_array(np, "sensor_regulator_timing_us",
 				psensor_dev->regulators.delay_us, psensor_dev->regulators.num);
 		if (ret != 0) {
@@ -167,13 +254,7 @@ static int vvcam_sensor_of_parse(struct platform_device *pdev)
 	}
 
 	psensor_dev->pdn_pin = of_get_named_gpio(np, "sensor_pdn", 0);
-	if (psensor_dev->pdn_pin >= 0) {
-		ret = devm_gpio_request(&pdev->dev, psensor_dev->pdn_pin,
-					"sensor_pdn");
-		if (ret < 0) {
-			pr_err("%s:sensor_pdn request failed\n", __func__);
-		}
-	} else {
+	if (psensor_dev->pdn_pin < 0) {
 		pr_err("sensor_pdn not defined for %s\n", psensor_dev->sensor_name);
 	}
 
@@ -184,13 +265,7 @@ static int vvcam_sensor_of_parse(struct platform_device *pdev)
 	}
 
 	psensor_dev->rst_pin = of_get_named_gpio(np, "sensor_rst", 0);
-	if (psensor_dev->rst_pin >= 0) {
-		ret = devm_gpio_request(&pdev->dev, psensor_dev->rst_pin,
-					"sensor_rst");
-		if (ret < 0) {
-			pr_err("%s:sensor_rst request failed\n", __func__);
-		}
-	} else {
+	if (psensor_dev->rst_pin < 0) {
 		pr_err("sensor_rst not defined for %s\n", psensor_dev->sensor_name);
 	}
 
@@ -227,7 +302,7 @@ static int vvcam_sensor_probe(struct platform_device *pdev)
 	struct vvcam_sensor_dev * psensor_dev;
 	struct device_node *np = pdev->dev.of_node;
 
-	pr_info("enter %s\n", __func__);
+	pr_debug("enter %s\n", __func__);
 
 	pdev->id = of_alias_get_id(np, "vivcam");
 
@@ -254,8 +329,10 @@ static int vvcam_sensor_probe(struct platform_device *pdev)
 	memset(psensor_dev,0,sizeof(struct vvcam_sensor_dev ));
 	pr_info("%s:sensor[%d]: psensor_dev =0x%px\n", __func__,pdev->id,psensor_dev);
 	psensor_dev->device_idx = pdev->id;
+    init_waitqueue_head(&psensor_dev->err_wait);
 
 	pdriver_dev->private = psensor_dev;
+    pdriver_dev->pdev = pdev;
 	mutex_init(&pdriver_dev->vvmutex);
 	platform_set_drvdata(pdev, pdriver_dev);
 
@@ -320,7 +397,7 @@ static int vvcam_sensor_probe(struct platform_device *pdev)
     extern int sensor_create_capabilities_sysfs(struct platform_device *pdev);
     sensor_create_capabilities_sysfs(pdev);
 	devise_register_index++;
-	pr_info("exit %s\n", __func__);
+	pr_debug("exit %s\n", __func__);
 	return ret;
 }
 
@@ -329,7 +406,7 @@ static int vvcam_sensor_remove(struct platform_device *pdev)
 	struct vvcam_sensor_driver_dev *pdriver_dev;
 	struct vvcam_sensor_dev * psensor_dev;
 
-	pr_info("enter %s\n", __func__);
+	pr_debug("enter %s\n", __func__);
 	devise_register_index--;
 	pdriver_dev = platform_get_drvdata(pdev);
 
@@ -376,7 +453,7 @@ static struct platform_driver vvcam_sensor_driver = {
 
 static void vvcam_sensor_pdev_release(struct device *dev)
 {
-	pr_info("enter %s\n", __func__);
+	pr_debug("enter %s\n", __func__);
 }
 
 #if 0//def WITH_VVCAM
@@ -399,7 +476,7 @@ static int __init vvcam_sensor_init_module(void)
 {
 	int ret = 0;
 
-	pr_info("enter %s\n", __func__);
+	pr_debug("enter %s\n", __func__);
 
 #if 0//def WITH_VVCAM
 	ret = platform_device_register(&vvcam_sensor_pdev);
@@ -431,7 +508,7 @@ static int __init vvcam_sensor_init_module(void)
 
 static void __exit vvcam_sensor_exit_module(void)
 {
-	pr_info("enter %s\n", __func__);
+	pr_debug("enter %s\n", __func__);
 
 	platform_driver_unregister(&vvcam_sensor_driver);
 

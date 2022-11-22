@@ -1,3 +1,4 @@
+
 #ifndef _FLASH_LED_IOCTL_H_
 #define _FLASH_LED_IOCTL_H_
 
@@ -15,6 +16,7 @@
 #define FLASH_LED_IOCTL_ENABLE              _IOWR(FLASH_LED_IOCTL_MAGIC, 8, int)
 #define FLASH_LED_IOCTL_DISABLE             _IOWR(FLASH_LED_IOCTL_MAGIC, 9, int)
 #define FLASH_LED_IOCTL_GET_FRAME_MASK_INFO_ADDR             _IOWR(FLASH_LED_IOCTL_MAGIC, 10, int)
+#define FLASH_LED_IOCTL_SET_SWITCH_MODE             _IOWR(FLASH_LED_IOCTL_MAGIC, 11, int)
 
 struct flash_led_sccb_cfg_s {
 	unsigned char slave_addr;
@@ -42,6 +44,14 @@ typedef enum {
     PROJECTION_EN = 2,
     FLOODLIGHT_PROJECTION_EN = 3,
 } flash_led_enable_mask_t;
+
+typedef enum {
+    PROJECTION_EVEN_FLOODLIGHT_ODD =0,
+    PROJECTION_ODD_FLOODLIGHT_EVEN = 1,
+    PROJECTION_ALWAYS_ON = 2,
+    FLOODLIGHT_ALWAYS_ON = 3,
+    BOTH_OFF =4,
+} flash_led_switch_mod_t;
 
 typedef struct {
     flash_led_type_t type;

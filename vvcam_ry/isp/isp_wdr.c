@@ -63,13 +63,13 @@ int isp_s_wdr(struct isp_ic_dev *dev)
 {
     isp_wdr_context_t* wdr = &dev->wdr;
 
-    pr_info(" enter %s\n", __func__);
+    isp_info(" enter %s\n", __func__);
 
     /*update wdr configuration  after frame end when isp enable*/
     if (!is_isp_enable(dev) || wdr->changed) {
         uint32_t isp_wdr_offset, isp_wdr_ctrl;
 
-        isp_wdr_offset = isp_read_reg(dev, REG_ADDR(isp_wdr_offset)); 
+        isp_wdr_offset = isp_read_reg(dev, REG_ADDR(isp_wdr_offset));
         REG_SET_SLICE( isp_wdr_offset, MRV_WDR_LUM_OFFSET, wdr->LumOffset );
         REG_SET_SLICE( isp_wdr_offset, MRV_WDR_RGB_OFFSET, wdr->RgbOffset );
     	isp_write_reg(dev, REG_ADDR(isp_wdr_offset), isp_wdr_offset);
@@ -81,8 +81,8 @@ int isp_s_wdr(struct isp_ic_dev *dev)
     } else {
         wdr->changed = true;
     }
-    pr_info(" %s wdr.changed %d \n", __func__, wdr->changed);
-   	return 0;    
+    isp_info(" %s wdr.changed %d \n", __func__, wdr->changed);
+   	return 0;
 }
 
 int isp_s_wdr_curve(struct isp_ic_dev *dev)
@@ -102,7 +102,7 @@ int isp_s_wdr_curve(struct isp_ic_dev *dev)
 
         if (i == 0)
         {
-        
+
             isp_write_reg(dev, REG_ADDR(isp_wdr_tonecurve_1), dYi);
         }
         else if (i == 1)
@@ -125,8 +125,8 @@ int isp_s_wdr_curve(struct isp_ic_dev *dev)
     }
 
     dYi = 0x00000000;
-    
-    isp_write_reg(dev, REG_ADDR(isp_wdr_offset), dYi);    
+
+    isp_write_reg(dev, REG_ADDR(isp_wdr_offset), dYi);
     isp_write_reg(dev, REG_ADDR(isp_wdr_deltamin), 0x00100000);
 
     return 0;

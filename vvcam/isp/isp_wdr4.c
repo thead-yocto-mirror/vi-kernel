@@ -272,12 +272,12 @@ static void wdr4_hw_init(struct isp_ic_dev *dev)
 	u32 slice_pixel_shift;
 	u32 slice_output_shift;// isp_wdr4_normalize_shift;
 	u32 isp_wdr4_shift;// isp_wdr4_gain_shift_bit;
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	width = isp_read_reg(dev, REG_ADDR(isp_acq_h_size));
 	height = isp_read_reg(dev, REG_ADDR(isp_acq_v_size));
 
-	pr_info("isp_wdr4 res: %d %d \n", width, height);
+	isp_info("isp_wdr4 res: %d %d \n", width, height);
 	/* firware initilization */
 
     isp_wdr4_strength = 128;         // valid values: [0,128]; isp_wdr4 will merge original and enhanced image
@@ -429,7 +429,7 @@ static void wdr4_hw_init(struct isp_ic_dev *dev)
 int isp_enable_wdr4(struct isp_ic_dev *dev)
 {
 #ifndef ISP_WDR_V4
-	pr_err("unsupported function: %s", __func__);
+	isp_err("unsupported function: %s", __func__);
 	return -EINVAL;
 #else
 	int32_t isp_wdr4_ctrl;
@@ -449,7 +449,7 @@ int isp_enable_wdr4(struct isp_ic_dev *dev)
 int isp_disable_wdr4(struct isp_ic_dev *dev)
 {
 #ifndef ISP_WDR_V4
-	pr_err("unsupported function: %s", __func__);
+	isp_err("unsupported function: %s", __func__);
 	return -EINVAL;
 #else
 	struct isp_wdr4_context *wdr4 = &dev->wdr4;
@@ -465,7 +465,7 @@ int isp_disable_wdr4(struct isp_ic_dev *dev)
 int isp_u_wdr4(struct isp_ic_dev *dev)
 {
 #ifndef ISP_WDR_V4
-	pr_err("unsupported function: %s", __func__);
+	isp_err("unsupported function: %s", __func__);
 	return -EINVAL;
 #else
 	wdr4_hw_init(dev);
@@ -477,7 +477,7 @@ int isp_s_wdr4(struct isp_ic_dev *dev)
 {
 
 #ifndef ISP_WDR_V4
-	pr_err("unsupported function: %s", __func__);
+	isp_err("unsupported function: %s", __func__);
 	return -EINVAL;
 #else
 	struct isp_wdr4_context *wdr4 = &dev->wdr4;

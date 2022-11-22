@@ -93,7 +93,7 @@ static int getRawBit(u32 type, u32 *bit, u32 *len)
 		break;
 #endif
 	default:
-		pr_err("unsupport raw formt: %d\n", type);
+		isp_err("unsupport raw formt: %d\n", type);
 		return -1;
 	}
 	return 0;
@@ -190,7 +190,7 @@ static void set_raw_buffer(struct isp_ic_dev *dev, struct isp_buffer_context *bu
 			buf->addr_y = dev->pp_write.buf_addr;
 			buf->size_y = dev->pp_write.buf_size;
 		}
-	/*pr_info("%s path %d type %d addr %08x line_num = %d buf_addr = 0x%x, buf_size = %d\n",
+	/*isp_info("%s path %d type %d addr %08x line_num = %d buf_addr = 0x%x, buf_size = %d\n",
 		__func__, buf->path, buf->type, addr, line_num, buf->addr_y, buf->size_y);*/
 	if (isRaw(buf->type)) {
 		if (addr != 0) {
@@ -207,7 +207,7 @@ static void set_raw_buffer(struct isp_ic_dev *dev, struct isp_buffer_context *bu
 int isp_set_buffer(struct isp_ic_dev *dev, struct isp_buffer_context *buf)
 {
 	if (!dev || !buf) {
-		pr_err("NULL pointer %s\n", __func__);
+		isp_err("NULL pointer %s\n", __func__);
 		return -1;
 	}
 
@@ -317,16 +317,16 @@ int isp_ioc_cfg_dma(struct isp_ic_dev *dev, void __user *args)
 		REG_ADDR(isp_mi_pp_dma_y_pic_lval), 0, PP_DMA_START_MASK}};
 #endif
 	if (dev == NULL || args == NULL) {
-		pr_info("input wrong parameter %s\n", __func__);
+		isp_info("input wrong parameter %s\n", __func__);
 		return -1;
 	}
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	viv_check_retval(copy_from_user(&dma, args, sizeof(dma)));
 	id = dma.id;
 	if ( id > ISP_MI_DMA_ID_MAX){
-		pr_info("id config wrong %s\n", __func__);
+		isp_info("id config wrong %s\n", __func__);
 		return -1;
 	}
 	path_fmt = isp_read_reg(dev,  dma_path_ctx[id].fmt_addr);
@@ -466,11 +466,11 @@ int isp_ioc_start_dma_read(struct isp_ic_dev *dev, void __user *args)
 	 u32 mi_hdr_ret_ctrl;
 	 u32 rd_wr_str;
 	if (dev == NULL || args == NULL) {
-		pr_info("input wrong parameter %s\n", __func__);
+		isp_info("input wrong parameter %s\n", __func__);
 		return -1;
 	}
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	viv_check_retval(copy_from_user(&dma_path, args, sizeof(dma_path)));
 	if (dma_path == ISP_MI_DMA_PATH_MCM_PP) {
 #ifndef ISP_MI_PP_READ
@@ -661,7 +661,7 @@ struct miv2_path_address {
 static void disable_bus_timeo_intr(struct isp_ic_dev *dev, u32 bus_addr)
 {
 	u32 val;
-	pr_info("%s  bus timeo interrupt register addr 0x%08x\n", __func__, bus_addr);
+	isp_info("%s  bus timeo interrupt register addr 0x%08x\n", __func__, bus_addr);
 	val = isp_read_reg(dev, bus_addr);
 	REG_SET_SLICE(val, MP_BUS_TIMEO_INTERRUPT_DISABLE, 1);
 	isp_write_reg(dev, bus_addr, val);
@@ -669,11 +669,11 @@ static void disable_bus_timeo_intr(struct isp_ic_dev *dev, u32 bus_addr)
 
 static void set_qos(struct isp_ic_dev *dev)
 {
-	pr_info("isp %s enter\n", __func__);
+	isp_info("isp %s enter\n", __func__);
 
 	isp_write_reg(dev, 0x1308, MI_QOS);
 	isp_write_reg(dev, 0x130C, MI_QOS2);
-	pr_info("isp %s exit\n", __func__);
+	isp_info("isp %s exit\n", __func__);
 }
 
 static void set_data_path(int id, struct isp_mi_data_path_context *path,
@@ -702,6 +702,7 @@ static void set_data_path(int id, struct isp_mi_data_path_context *path,
 #else
 	//id 0 is mp path;id 1 is sp path;id 2 is sp2 path;
 	//id 3 is post process path write;
+
 	struct miv2_path_address  path_list[PATHNUM] = {
 		{
 			REG_ADDR(miv2_mp_bus_cfg), REG_ADDR(miv2_mp_bus_id), REG_ADDR(miv2_mp_bus_timeo), REG_ADDR(miv2_mp_ctrl),
@@ -789,7 +790,7 @@ static void set_data_path(int id, struct isp_mi_data_path_context *path,
 	if (path_list[id].format_conv_ctrl) {
 		conv_format_ctrl = isp_read_reg(dev, path_list[id].format_conv_ctrl);
 	}
-	pr_err("mi %s  id %d  fmt_bit[id].raw_bit 0x%08x miv2_ctrl 0x%08x ", __func__, id, path_list[id].raw_enable_bit, miv2_ctrl);
+	isp_info("mi %s  id %d  fmt_bit[id].raw_bit 0x%08x miv2_ctrl 0x%08x ", __func__, id, path_list[id].raw_enable_bit, miv2_ctrl);
 
 	path_ctrl = isp_read_reg(dev, path_list[id].path_ctrl_addr);
 	switch (path->out_mode) {
@@ -819,41 +820,49 @@ static void set_data_path(int id, struct isp_mi_data_path_context *path,
 	case IC_MI_DATAMODE_RAW10:
 		mi_set_slice(&format, fmt_bit[id].raw_bit, 1);
 		miv2_ctrl |= path_list[id].raw_enable_bit;
-
-		mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, 1);
+		mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, path->raw_is_big_endian);
+		//if (id == ISP_MI_PATH_PP) {
+		//	mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, 0); // RY PP READ didn't cfg raw_swap_bit(pp_rd_swap_y) = 0(default)
+		//} else {
+		//	mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, 1); // MP SP1 SP2 swap words
+		//}
+		
 		break;
 	case IC_MI_DATAMODE_RAW12:
 #ifdef ISP_MI_HDR
 		if (id >= ISP_MI_HDR_L && id <= ISP_MI_HDR_VS) {
 			mi_set_slice(&format, fmt_bit[id].raw_bit, 0);
 			path_ctrl |= path_list[id].raw_enable_bit;
-			//mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, 1);
+			//mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, 0);
 		}
 #endif
-		if (id <= ISP_MI_PATH_PP) {
-			mi_set_slice(&format, fmt_bit[id].raw_bit, 2);
-			miv2_ctrl |= path_list[id].raw_enable_bit;
-			mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, 1);
-		}
+		mi_set_slice(&format, fmt_bit[id].raw_bit, 2);
+		miv2_ctrl |= path_list[id].raw_enable_bit;
+		mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, path->raw_is_big_endian);
+		//if (id == ISP_MI_PATH_PP) {
+		//	mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, 0); // RY PP READ didn't cfg raw_swap_bit(pp_rd_swap_y) = 0(default)
+		//} else {
+		//	mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, 1); // MP SP1 SP2 swap words
+		//}
 		break;
 	case IC_MI_DATAMODE_RAW14:
 		mi_set_slice(&format, fmt_bit[id].raw_bit, 3);
 		miv2_ctrl |= path_list[id].raw_enable_bit;
 
-		mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, 1);
+		mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, path->raw_is_big_endian);
 		break;
 	case IC_MI_DATAMODE_RAW16:
 #ifdef ISP_MI_HDR
 		if (id >= ISP_MI_HDR_L && id <= ISP_MI_HDR_VS) {
 			mi_set_slice(&format, fmt_bit[id].raw_bit, 1);
 			path_ctrl |= path_list[id].raw_enable_bit;
-			//mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, 1);
+			//mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, path->raw_is_big_endian);
 		}
 #endif
 		if (id <= ISP_MI_PATH_PP) {
 			mi_set_slice(&format, fmt_bit[id].raw_bit, 4);
 			miv2_ctrl |= path_list[id].raw_enable_bit;
-			mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, 1);
+			mi_set_slice(&bus_cfg, path_list[id].wr_raw_swap_bit, path->raw_is_big_endian);
 		}
 		break;
 	case IC_MI_DATAMODE_RGB888:
@@ -863,7 +872,7 @@ static void set_data_path(int id, struct isp_mi_data_path_context *path,
 		miv2_ctrl |= path_list[id].ycbcr_enable_bit;
 		break;
 	default:
-		pr_err("mi %s unsupport format: %d", __func__, path->out_mode);
+		isp_err("mi %s unsupport format: %d", __func__, path->out_mode);
 		return;
 	}
 
@@ -972,7 +981,7 @@ static void set_data_path(int id, struct isp_mi_data_path_context *path,
 		// if (line_num != 0) {
 		// 	y_llength = y_llength & 0xff ? (y_llength & 0xffffff00 + 0x100):y_llength;
 		// }
-		pr_info("%s:line_num = %d y_llength = 0x%x\n", __func__, line_num, y_llength);
+		isp_info("%s:line_num = %d y_llength = 0x%x\n", __func__, line_num, y_llength);
 		isp_write_reg(dev, REG_ADDR(isp_mi_pp_y_llength), y_llength);
 		isp_write_reg(dev, path_list[id].raw_pic_size_addr, path->out_height * y_llength );
 #else
@@ -1014,7 +1023,7 @@ static void set_data_path(int id, struct isp_mi_data_path_context *path,
 	}
 #endif
 
-	pr_info("%s:path_ctrl 0x%08x\n", __func__, path_ctrl);
+	isp_info("%s:path_ctrl 0x%08x\n", __func__, path_ctrl);
 	acq_proc = isp_read_reg(dev, REG_ADDR(isp_acq_prop));
 	isp_write_reg(dev, REG_ADDR(isp_acq_prop),
 		      acq_proc & ~MRV_ISP_LATENCY_FIFO_SELECTION_MASK);
@@ -1074,7 +1083,7 @@ int isp_mi_start(struct isp_ic_dev *dev)
 	int i;
 	struct isp_mi_context mi = *(&dev->mi);
 	u32 imsc, miv2_mcm_bus_id;
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	miv2_mcm_bus_id = isp_read_reg(dev, REG_ADDR(miv2_mcm_bus_id));
 	miv2_mcm_bus_id |= MCM_BUS_SW_EN_MASK;
@@ -1109,7 +1118,8 @@ int isp_mi_start(struct isp_ic_dev *dev)
 
 
 	//isp_write_reg(dev, REG_ADDR(miv2_imsc1), 0x7ffffff);
-	isp_write_reg(dev, REG_ADDR(miv2_imsc1), 0);
+	isp_write_reg(dev, REG_ADDR(miv2_imsc1), (MI_MP_BUS_TIMEO_MASK | MI_SP1_BUS_TIMEO_MASK | MI_SP2_BUS_TIMEO_MASK |
+		MI_MP_BUS_BUSERR_MASK | MI_SP1_BUS_BUSERR_MASK | MI_SP2_BUS_BUSERR_MASK));
 #ifdef ISP_MI_PP_WRITE
 	imsc = isp_read_reg(dev, REG_ADDR(miv2_imsc2));
     if (line_num == 0) {
@@ -1141,7 +1151,7 @@ int isp_mi_start(struct isp_ic_dev *dev)
 
 int isp_mi_stop(struct isp_ic_dev *dev)
 {
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 #ifdef ISP_MI_PP_WRITE
 	isp_write_reg(dev, REG_ADDR(miv2_imsc2), 0);
 #endif
@@ -1171,25 +1181,25 @@ int isp_set_bp_buffer(struct isp_ic_dev *dev, struct isp_bp_buffer_context *buf)
 int  isp_set_ppw_line_num(struct isp_ic_dev *dev)
 {
 	if (dev == NULL) {
-		pr_err("Wrong input %s\n", __func__);
+		isp_err("Wrong input %s\n", __func__);
 		return -1;
 	}
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	isp_write_reg(dev, REG_ADDR(mi_sp1_ppw_ycbcr_entry_line_num), dev->pp_write.entry_line_num);
-	pr_info("exit %s\n", __func__);
+	isp_info("exit %s\n", __func__);
 	return 0;
 }
 int  isp_get_ppw_pic_cnt(struct isp_ic_dev *dev, u16* pic_cnt)
 {
 
 	if (dev == NULL) {
-		pr_err("Wrong input %s\n", __func__);
+		isp_err("Wrong input %s\n", __func__);
 		return -1;
 	}
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	*pic_cnt = isp_read_reg(dev, REG_ADDR(mi_sp1_ppw_ycbcr_entry_pic_cnt));
-	pr_info("exit %s\n", __func__);
+	isp_info("exit %s\n", __func__);
 	return 0;
 }
 #endif
@@ -1200,13 +1210,13 @@ int  isp_cfg_pp_dma_line_entry(struct isp_ic_dev *dev)
 {
 	pp_dma_line_entry_t* pp_dam_line_entry = &dev->pp_dma_line_entry;
 	if (dev == NULL) {
-		pr_err("Wrong input %s\n", __func__);
+		isp_err("Wrong input %s\n", __func__);
 		return -1;
 	}
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	isp_write_reg(dev, REG_ADDR(mi_pp_dma_y_entry_line_num), pp_dam_line_entry->entry_line_num);
 	isp_write_reg(dev, REG_ADDR(mi_pp_dma_y_buf_line_num), pp_dam_line_entry->buf_line_num);
-	pr_info("exit %s\n", __func__);
+	isp_info("exit %s\n", __func__);
 	return 0;
 }
 #endif

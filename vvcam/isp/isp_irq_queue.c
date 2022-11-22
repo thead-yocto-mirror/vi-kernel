@@ -79,6 +79,7 @@
 #include <stdbool.h>
 #endif
 #include "isp_irq_queue.h"
+#include "isp_ioctl.h"
 
   //enqueue
 int isp_irq_enqueue(isp_mis_t *new,isp_mis_t* head)
@@ -88,7 +89,6 @@ int isp_irq_enqueue(isp_mis_t *new,isp_mis_t* head)
 
 
     if (new == NULL || head == NULL) {
-        //printk("%s: input wrong parameter\n", __func__);
         return -1;
     }
     new_node->val = new->val;
@@ -141,7 +141,7 @@ int isp_irq_create_circle_queue(isp_mis_list_t* pCList, int number)
   int i;
   isp_mis_t* pMisNode;
   if (pCList == NULL || number <= 0) {
-      printk("%s: create circle queue failed\n", __func__);
+      isp_info("%s: create circle queue failed\n", __func__);
       return -1;
   }
 
@@ -152,12 +152,12 @@ int isp_irq_create_circle_queue(isp_mis_list_t* pCList, int number)
       pCList->pRead = pCList->pHead;
       pCList->pWrite = pCList->pHead;
   }
-  printk("%s:pHead %px\n", __func__, pCList->pHead);
+  isp_info("%s:pHead %px\n", __func__, pCList->pHead);
   for (i = 0; i < number - 1; i++) {
       pMisNode = (isp_mis_t*)kmalloc(sizeof(isp_mis_t), GFP_KERNEL);
       INIT_LIST_HEAD(&pMisNode->list);
       list_add_tail(&pMisNode->list, &pCList->pHead->list);
-      printk("%s:pMisNode %px\n", __func__, pMisNode);
+      isp_info("%s:pMisNode %px\n", __func__, pMisNode);
   }
 
 #endif
@@ -169,18 +169,18 @@ int isp_irq_destroy_circle_queue(isp_mis_list_t* pCList)
 #ifdef __KERNEL__
   isp_mis_t* pMisNode;
   if ((pCList == NULL) || (pCList->pHead == NULL) ) {
-      printk("%s: destroy circle queue failed. pClist %px\n", __func__, pCList);
+      isp_err("%s: destroy circle queue failed. pClist %px\n", __func__, pCList);
       return -1;
   }
 
   while(!list_empty(&pCList->pHead->list)) {
       pMisNode = list_first_entry(&pCList->pHead->list, isp_mis_t, list);
-      printk("%s:pMisNode %px\n", __func__, pMisNode);
+      isp_info("%s:pMisNode %px\n", __func__, pMisNode);
       list_del(&pMisNode->list);
       kfree(pMisNode);
       pMisNode = NULL;
   }
-  printk("%s:pHead %px\n", __func__, pCList->pHead);
+  isp_info("%s:pHead %px\n", __func__, pCList->pHead);
   kfree(pCList->pHead);
   pCList->pHead = NULL;
   pCList->pRead = NULL;
@@ -194,7 +194,7 @@ int isp_irq_read_circle_queue(isp_mis_t* data, isp_mis_list_t* pCList)
 #ifdef __KERNEL__
   //isp_mis_t* pReadEntry;
   if (pCList == NULL) {
-      printk("%s: can not read circle queue\n", __func__);
+      isp_err("%s: can not read circle queue\n", __func__);
       return -1;
   }
 
@@ -220,7 +220,7 @@ int isp_irq_write_circle_queue(isp_mis_t* data, isp_mis_list_t* pCList)
 #ifdef __KERNEL__
   isp_mis_t* pWriteEntry;
   if (pCList == NULL) {
-      printk("%s: can not read circle queue\n", __func__);
+      isp_err("%s: can not read circle queue\n", __func__);
       return -1;
   }
 

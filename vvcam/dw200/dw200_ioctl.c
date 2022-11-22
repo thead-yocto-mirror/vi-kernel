@@ -385,7 +385,9 @@ void visys_reset(void)
 {
 	u32 val = __raw_readl(visys_sw_rst);
     __raw_writel( val & ~BIT(31), visys_sw_rst);
+	udelay(1);
     __raw_writel(val, visys_sw_rst);
+	udelay(1);
 }
 
 int vse_reset(struct dw200_subdev *dev)
@@ -973,16 +975,6 @@ int vse_s_params(struct dw200_subdev *dev)
 	return 0;
 }
 
-void dw200_mutex_lock(struct dw200_subdev *dev)
-{
-	mutex_lock(dev->vvmutex);
-}
-
-void dw200_mutex_unlock(struct dw200_subdev *dev)
-{
-	mutex_unlock(dev->vvmutex);
-}
-
 long dw200_priv_ioctl(struct dw200_subdev *dev, unsigned int cmd, void *args)
 {
 	int ret = -1;
@@ -1106,14 +1098,6 @@ long dw200_priv_ioctl(struct dw200_subdev *dev, unsigned int cmd, void *args)
 			vse_mask_irq(dev, mask);
 			break;
 		}
-	case DW200IOC_LOCK:
-		dw_info("DW200IOC_LOCK\n");
-		dw200_mutex_lock(dev);
-		break;
-	case DW200IOC_UNLOCK:
-		dw_info("DW200IOC_UNLOCK\n");
-		dw200_mutex_unlock(dev);
-		break;
 	case DW200IOC_VISYS_RESET:
 		dw_info("DW200IOC_VISYS_RESET\n");
 		visys_reset();

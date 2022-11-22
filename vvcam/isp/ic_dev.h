@@ -136,6 +136,7 @@ struct isp_digital_gain_cxt {
 	u16 gain_b;
 	u16 gain_gr;
 	u16 gain_gb;
+	bool changed;
 };
 
 struct isp_mi_data_path_context {
@@ -152,11 +153,13 @@ struct isp_mi_data_path_context {
 	bool vscale;
 	int pixelformat;
 	bool yuv_bit;
+	bool raw_is_big_endian;
 };
 
 struct isp_dummy_hblank_cxt {
 	u8 bp, fp, w, in_hsize;
 };
+
 enum MIV2_PATH_ID {
 	ISP_MI_PATH_MP = 0,
 	ISP_MI_PATH_SP,
@@ -916,6 +919,9 @@ struct isp_rgbgamma_data {
 
 struct isp_rgbgamma_context {
 	bool enable;
+	struct isp_rgbgamma_data *data;
+	bool data_changed;
+	bool changed;
 };
 
 struct isp_irq_data {

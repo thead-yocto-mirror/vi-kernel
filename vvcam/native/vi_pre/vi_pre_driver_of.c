@@ -100,7 +100,7 @@ static long vi_pre_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	long ret = 0;
 	struct vi_pre_dev *pdriver_dev;
 
-	pr_info("enter %s\n", __func__);
+	pr_debug("enter %s\n", __func__);
 	//printk("%s, %d, vipre_cmd %u\n", __func__, __LINE__, cmd);
 	pdriver_dev = file->private_data;
 	if (pdriver_dev == NULL) {
@@ -113,7 +113,7 @@ static long vi_pre_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	ret = vi_pre_priv_ioctl(pdriver_dev, cmd ,(void *)arg);
 	mutex_unlock(&pdriver_dev->mutex);
 
-	pr_info("exit %s\n", __func__);
+	pr_debug("exit %s\n", __func__);
 
 	return ret;
 };
@@ -160,23 +160,7 @@ static int vi_pre_mmap(struct file *pFile, struct vm_area_struct *vma)
 	return 0;
 };
 
-static DECLARE_WAIT_QUEUE_HEAD(vipre_waitq);
-static unsigned vi_pre_poll(struct file *file, poll_table *wait)
-{
-    extern int *vi_pre_event(void);
-    int *event = 0;
-    unsigned int mask = 0;
-    event = vi_pre_event();
-    poll_wait(file, &vipre_waitq, wait);
-
-    if (*event) {
-        mask |= POLLIN | POLLRDNORM;
-        *event = 0;
-    }
-
-    return mask;
-}
-
+extern unsigned vi_pre_poll(struct file *file, poll_table *wait);
 struct file_operations vi_pre_fops = {
 	.owner = THIS_MODULE,
 	.open = vi_pre_open,
@@ -185,16 +169,6 @@ struct file_operations vi_pre_fops = {
 	.mmap = vi_pre_mmap,
 	.poll = vi_pre_poll,
 };
-
-static irqreturn_t vi_pre_irq(int irq, void *dev_id)
-{
-    extern void vi_pre_dma_interrupt_handler(struct vi_pre_dev *pdriver_dev);
-	struct vi_pre_dev *pdriver_dev = dev_id;
-    vi_pre_dma_interrupt_handler(pdriver_dev);
-    wake_up_interruptible(&vipre_waitq);
-
-    return IRQ_HANDLED;
-}
 
 static int vi_pre_probe(struct platform_device *pdev)
 {
@@ -298,6 +272,7 @@ static int vi_pre_probe(struct platform_device *pdev)
     }
 
     spin_lock_init(&pdriver_dev->slock);
+    /*
     if (device_property_read_bool(dev, "vi_pre_irq_en")) {
         ret = devm_request_irq(dev, pdriver_dev->irq,
                                vi_pre_irq, IRQF_SHARED,
@@ -307,6 +282,7 @@ static int vi_pre_probe(struct platform_device *pdev)
             goto end;
         }
     }
+    */
 
     pm_runtime_enable(&pdev->dev);
     ret = vipre_runtime_resume(&pdev->dev);

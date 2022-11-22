@@ -191,6 +191,9 @@ int32_t flash_led_i2c_write(struct flash_led_dev *dev, uint32_t address, uint32_
 	                         address,dev->flash_led_sccb_cfg.addr_byte,
 	                         data,dev->flash_led_sccb_cfg.data_byte);
 
+    if (ret != 0) {
+        printk("%s error\n", __func__);
+    }
 	return ret;
 }
 
@@ -289,6 +292,7 @@ long flash_led_priv_ioctl(struct flash_led_ctrl *dev, unsigned int cmd, void __u
             check_retval(copy_from_user(&flash_led, args, sizeof(flash_led)));
             frame_irq_cnt_clear(dev);
             dev->enable |= flash_led;
+            flash_led_switch(dev,0);
             ret = 0;
             break;
         case FLASH_LED_IOCTL_DISABLE:
@@ -308,6 +312,12 @@ long flash_led_priv_ioctl(struct flash_led_ctrl *dev, unsigned int cmd, void __u
             addr = dev->frame_mark_info_addr;
             pr_info("FLASH_LED_IOCTL_GET_FRAME_MASK_INFO_ADDR 0x%lx\n", addr);
             check_retval(copy_to_user(args, &addr, sizeof(addr)));
+            ret = 0;
+        }
+            break;
+        case FLASH_LED_IOCTL_SET_SWITCH_MODE: {
+            check_retval(copy_from_user(&dev->switch_mode,args, sizeof(dev->switch_mode)));
+            pr_info("FLASH_LED_IOCTL_SET_SWITCH_MODE 0x%lx\n", dev->switch_mode);
             ret = 0;
         }
             break;
@@ -367,20 +377,24 @@ int flash_led_init(struct flash_led_ctrl *dev)
     floodlight->flash_led_sccb_cfg.slave_addr = dev->device_idx+1;
     projection->flash_led_sccb_cfg.slave_addr = dev->device_idx+2;
 
-    if (floodlight->i2c_bus == UNDEFINED_IN_DTS && projection->i2c_bus == UNDEFINED_IN_DTS) {
-		pr_err("%s, %d, flash_led i2c bus invalid\n",__func__, __LINE__);
-        return -1;
-    }
-
     floodlight->flash_led_func = NULL;
     projection->flash_led_func = NULL;
 
+    if (floodlight->i2c_bus == UNDEFINED_IN_DTS && projection->i2c_bus == UNDEFINED_IN_DTS) {
+		pr_warn("%s, %d, flash_led i2c bus invalid\n",__func__, __LINE__);
+        return -1;
+    }
+
+    dev->switch_mode = BOTH_OFF;
     if (floodlight->i2c_bus != UNDEFINED_IN_DTS) {
         floodlight->flash_led_func = floodlight_func;
+        dev->switch_mode = FLOODLIGHT_ALWAYS_ON;
     }
 
     if (projection->i2c_bus != UNDEFINED_IN_DTS) {
         projection->flash_led_func = projection_func;
+        dev->switch_mode = dev->switch_mode == FLOODLIGHT_ALWAYS_ON ?
+                                                PROJECTION_EVEN_FLOODLIGHT_ODD:PROJECTION_ALWAYS_ON;
     }
 
     if (floodlight->i2c_bus == projection->i2c_bus) {
@@ -412,23 +426,7 @@ int flash_led_init(struct flash_led_ctrl *dev)
         }
     }
 
-    if (floodlight->flash_led_func != NULL) {
-        ret = floodlight->flash_led_func->init(floodlight);
-        if (ret != 0) {
-		    pr_err("%s, %d, floodlight init error\n", __func__, __LINE__);
-            return ret;
-        }
-    }
-
-    if (projection->flash_led_func != NULL) {
-        ret = projection->flash_led_func->init(projection);
-        if (ret != 0) {
-		    pr_err("%s, %d, projection init error\n", __func__, __LINE__);
-            return ret;
-        }
-    }
-
-    printk("%s,%d, exit\n", __func__, __LINE__);
+    pr_info("%s,%d, exit\n", __func__, __LINE__);
 
 	return ret;
 }

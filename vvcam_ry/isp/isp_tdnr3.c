@@ -73,7 +73,7 @@ int isp_tdnr_cfg_gamma(struct isp_ic_dev *dev)
 	//const u8 tdnrRegGap = 8;
 	bit_width = 12;
 
-    pr_info("enter %s\n", __func__);
+    isp_info("enter %s\n", __func__);
 
 	for (i = 0; i < DENOISE3D_GAMMA_BIN - 3; i += 5)
 	{
@@ -117,7 +117,7 @@ int  isp_s_tdnr(struct isp_ic_dev *dev)
 	/* spacial */
 	u32 strength = tdnr->strength;
 
-    pr_info("enter %s\n", __func__);
+    isp_info("enter %s\n", __func__);
 	strength = MIN(MAX(strength, 0), 128);
 
 	isp_denoise3d2_ctrl = isp_read_reg(dev, REG_ADDR(isp_denoise3d2_ctrl));
@@ -134,7 +134,7 @@ int  isp_s_tdnr(struct isp_ic_dev *dev)
 		isp_write_reg(dev, REG_ADDR(isp_denoise3d2_strength), strength);
 	} else {
 		isp_write_reg(dev, REG_ADDR(isp_denoise3d2_strength), 0);
-		if (dev->tdnr.frames == 2) 
+		if (dev->tdnr.frames == 2)
 			return 0 ;
 	}
 #endif
@@ -213,7 +213,7 @@ int isp_tdnr_set_strength(struct isp_ic_dev *dev)
 {
 	u32 isp_denoise3d2_strength;
 	struct isp_tdnr_context *tdnr = &dev->tdnr;
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	isp_denoise3d2_strength = isp_read_reg(dev, REG_ADDR(isp_denoise3d2_strength));
 	REG_SET_SLICE(isp_denoise3d2_strength, DENOISE3D_V20_TNR_STRENGTH, tdnr->strength);
@@ -227,7 +227,7 @@ int isp_tdnr_set_motion(struct isp_ic_dev *dev)
 {
 	struct isp_tdnr_context *tdnr = &dev->tdnr;
 	u32 isp_denoise3d2_motion_inv;
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	isp_denoise3d2_motion_inv = isp_read_reg(dev, REG_ADDR(isp_denoise3d2_motion_inv));
 	REG_SET_SLICE(isp_denoise3d2_motion_inv, DENOISE3D_V20_MOTION_INV, tdnr->motion_inv_factor);
@@ -240,7 +240,7 @@ int isp_tdnr_enable(struct isp_ic_dev *dev)
 {
 	u32 regVal = 0;
 	u32 strength = dev->tdnr.strength;
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	regVal = isp_read_reg(dev, REG_ADDR(isp_denoise3d2_ctrl));
 	REG_SET_SLICE(regVal, DENOISE3D_V20_ENABLE, 1);
 	// REG_SET_SLICE(regVal, DENOISE3D_V20_REF_RESET, 1);
@@ -258,7 +258,7 @@ int isp_tdnr_disable(struct isp_ic_dev *dev)
 {
 	u32 regVal = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	regVal = isp_read_reg(dev, REG_ADDR(isp_denoise3d2_ctrl));
 	// REG_SET_SLICE(regVal, DENOISE3D_V20_ENABLE, 0);
 	isp_write_reg(dev, REG_ADDR(isp_denoise3d2_ctrl), regVal);
@@ -273,7 +273,7 @@ int isp_tdnr_enable_tdnr(struct isp_ic_dev *dev)
 {
 	u32 regVal = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	regVal = isp_read_reg(dev, REG_ADDR(isp_denoise3d2_ctrl));
 	REG_SET_SLICE(regVal, DENOISE3D_V20_TNR_ENABLE, 1);
 	isp_write_reg(dev, REG_ADDR(isp_denoise3d2_ctrl), regVal);
@@ -287,7 +287,7 @@ int isp_tdnr_disable_tdnr(struct isp_ic_dev *dev)
 {
 	u32 regVal = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	regVal = isp_read_reg(dev, REG_ADDR(isp_denoise3d2_ctrl));
 	REG_SET_SLICE(regVal, DENOISE3D_V20_TNR_ENABLE, 0);
 	isp_write_reg(dev, REG_ADDR(isp_denoise3d2_ctrl), regVal);
@@ -300,7 +300,7 @@ int isp_tdnr_enable_2dnr(struct isp_ic_dev *dev)
 {
 	//u32 regVal = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	/*regVal = isp_read_reg(dev, REG_ADDR(isp_denoise3d2_ctrl));
 	REG_SET_SLICE(regVal, DENOISE3D_V20_NLM_ENABLE, 1);
 	isp_write_reg(dev, REG_ADDR(isp_denoise3d2_ctrl), regVal);*/
@@ -314,7 +314,7 @@ int isp_tdnr_disable_2dnr(struct isp_ic_dev *dev)
 {
 	//u32 regVal = 0;
 
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	/*regVal = isp_read_reg(dev, REG_ADDR(isp_denoise3d2_ctrl));
 	REG_SET_SLICE(regVal, DENOISE3D_V20_NLM_ENABLE, 0);
 	isp_write_reg(dev, REG_ADDR(isp_denoise3d2_ctrl), regVal);*/
@@ -327,7 +327,7 @@ int isp_tdnr_disable_2dnr(struct isp_ic_dev *dev)
 
 int isp_tdnr_g_stats(struct isp_ic_dev *dev, struct isp_tdnr_stats *stats)
 {
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	if (!dev || !stats) {
 		return -EINVAL;
 	}
@@ -344,7 +344,7 @@ int isp_tdnr_u_noise(struct isp_ic_dev *dev)
 {
 	u32 regVal = 0;
 	struct isp_tdnr_context *tdnr = &dev->tdnr;
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	regVal = 0;
 	REG_SET_SLICE(regVal, DENOISE3D_V20_NOISE_LEVEL, tdnr->noise_level);
@@ -364,7 +364,7 @@ int isp_tdnr_u_thr(struct isp_ic_dev *dev)
 {
 	u32 regVal = 0;
 	struct isp_tdnr_context *tdnr = &dev->tdnr;
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	regVal = 0;
 	REG_SET_SLICE(regVal, DENOISE3D_V20_THR_UPDATE, tdnr->update_factor);
@@ -388,7 +388,7 @@ int isp_tdnr_s_buf(struct isp_ic_dev *dev)
 	u32 miv2_imsc = isp_read_reg(dev, REG_ADDR(miv2_imsc));
 	u32 miv2_sp2_ctrl = isp_read_reg(dev, REG_ADDR(miv2_sp2_ctrl));
 	u32 isp_mi_sp2_raw2_ctrl = isp_read_reg(dev, REG_ADDR(isp_mi_sp2_raw2_ctrl));
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 
 	/*
 
@@ -427,7 +427,7 @@ int isp_tdnr_s_buf(struct isp_ic_dev *dev)
 	in_height /= 2;
 	lval = (in_width); // RAW8 output
 	size = in_height * lval;
-	pr_info("%s 0x%08x\n", __func__, REG_ADDR(isp_mi_sp2_raw2_base_ad_init));
+	isp_info("%s 0x%08x\n", __func__, REG_ADDR(isp_mi_sp2_raw2_base_ad_init));
 	isp_write_reg(dev, REG_ADDR(isp_mi_sp2_raw2_base_ad_init), buf->pa_motion);
 	isp_write_reg(dev, REG_ADDR(isp_mi_sp2_raw2_size_init), size);
 	isp_write_reg(dev, REG_ADDR(isp_mi_sp2_raw2_offs_cnt_init), 0);
@@ -510,7 +510,7 @@ int isp_r_tdnr_refer(struct isp_ic_dev *dev)
 	u32 miv2_imsc = isp_read_reg(dev, REG_ADDR(miv2_imsc));
 	u32 miv2_sp2_ctrl = isp_read_reg(dev, REG_ADDR(miv2_sp2_ctrl));
 	u32 isp_mi_sp2_raw2_ctrl = isp_read_reg(dev, REG_ADDR(isp_mi_sp2_raw2_ctrl));
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	isp_write_reg(dev, REG_ADDR(miv2_sp2_dma_raw_pic_start_ad), buf->pa_refer);
 	isp_write_reg(dev, REG_ADDR(isp_mi_sp2_dma_raw2_pic_start_ad), buf->pa_motion);
 
@@ -543,7 +543,7 @@ int isp_r_tdnr_motion(struct isp_ic_dev *dev)
 	struct isp_tdnr_buffer* buf = &dev->tdnr.buf;
 	u32 miv2_ctrl = isp_read_reg(dev, REG_ADDR(miv2_ctrl));
 	u32 isp_mi_sp2_raw2_ctrl = isp_read_reg(dev, REG_ADDR(isp_mi_sp2_raw2_ctrl));
-	pr_info("enter %s\n", __func__);
+	isp_info("enter %s\n", __func__);
 	isp_write_reg(dev, REG_ADDR(isp_mi_sp2_dma_raw2_pic_start_ad), buf->pa_motion);
 
 	REG_SET_SLICE(miv2_ctrl, SP2_RAW2_RDMA_START, 1);

@@ -77,33 +77,6 @@ typedef struct {
    u32 dma_ctl51;
 } vi_dma_reg_t;
 
-typedef enum {
-    VI_PRE_RAW_6BIT,
-    VI_PRE_RAW_7BIT,
-    VI_PRE_RAW_8BIT,
-    VI_PRE_RAW_10BIT_16ALIGN,
-    VI_PRE_RAW_12BIT,
-    VI_PRE_RAW_10BIT,
-} vi_pre_data_width_t;
-
-typedef enum {
-    VI_PRE_M_FRAME,
-    VI_PRE_N_LANE,
-} vi_pre_dma_mode_t;
-
-typedef struct {
-    int vc_num;         //1~3
-    vi_pre_data_width_t width;
-    vi_pre_dma_mode_t mode;
-    u32 resolution_h;
-    u32 resolution_v;
-    u32 line_size; //Data size of one line, unit byte; Must be 256-byte aligned
-    u32 num;       //n line num, or m frame num(m frme max is 4)
-    u32 n_line_int;//only used for nline mode.(Generate an interrupt every time when n lines are completed). n_line_int <= num
-    u32 buf_size;
-    u8 *buf;
-} vi_pre_dma_cfg_t;
-
 static vi_dma_reg_t dma_reg = {
     .dma_ctl0 = 0x198,
     .dma_ctl1 = 0x19c,
@@ -405,8 +378,10 @@ static void dma_enable(struct vi_pre_dev *dev, int en)
 {
     if(en) {
         vi_pre_dma_write(dev, dma_reg.dma_ctl10, 1);
+        pr_info("%s, %d, dma start\n", __func__, __LINE__);
     } else {
         vi_pre_dma_write(dev, dma_reg.dma_ctl10, 0);
+        pr_info("%s, %d, dma stop\n", __func__, __LINE__);
     }
 }
 
@@ -448,15 +423,15 @@ static u16 nline_mode_period_cnt(struct vi_pre_dev *dev, int ch)
     }
 }
 
-static void mframe_mode_set_position(struct vi_pre_dev *dev, int ch, int f, int l)
+static void mframe_mode_set_position(struct vi_pre_dev *dev, int vc_ch, int f, int l)
 {
-    u32 reg = dma_reg.dma_ctl23 + ch / 2 * 4;
+    u32 reg = dma_reg.dma_ctl23 + vc_ch / 2 * 4;
     u32 reg_val = vi_pre_dma_read(dev, reg);
 
     f &= 3;
     l &= 0xfff;
 
-    if (ch % 2) {
+    if (vc_ch % 2) {
         reg_val &=~(0xffff << 16);
         reg_val |= (l << 16) | (f << 29);
     } else {
@@ -486,18 +461,13 @@ static void mframe_set_start_addr(struct vi_pre_dev *dev, int frame_id, int vc_c
 
 static u32 mframe_frame_done_flag(struct vi_pre_dev *dev)
 {
-    return vi_pre_dma_read(dev, dma_reg.dma_ctl43) & 0xfff;
+    return vi_pre_dma_read(dev, dma_reg.dma_ctl43);
 }
 
 static void mframe_frame_done_flag_clear(struct vi_pre_dev *dev, u32 mask)
 {
-
-     u32 reg_val  = vi_pre_dma_read(dev, dma_reg.dma_ctl43);
-     reg_val |= mask;
-
      vi_pre_dma_write(dev, dma_reg.dma_ctl43, mask);
 }
-
 
 static void dma_interrupt_set(struct vi_pre_dev *dev, u32 mask, int en)
 {
@@ -509,6 +479,7 @@ static void dma_interrupt_set(struct vi_pre_dev *dev, u32 mask, int en)
     }
 
     vi_pre_dma_write(dev, dma_reg.dma_ctl44, reg_val);
+    reg_val = vi_pre_dma_read(dev, dma_reg.dma_ctl44);
 }
 
 static u16 dma_interrupt_status(struct vi_pre_dev *dev)
@@ -532,10 +503,12 @@ static int vi_pre_mframe_config(struct vi_pre_dev *dev, vi_pre_dma_cfg_t *cfg)
     int j = 0;
 
     if (cfg->num > 4) {
+        printk("%s, %d, cfg frame num error!!!\n", __func__, __LINE__);
         return -1;
     }
 
     if (cfg->buf_size < cfg->line_size * cfg->resolution_v * cfg->num) {
+        printk("%s, %d, vipre buf size error!!!\n", __func__, __LINE__);
         return -1;
     }
 
@@ -607,7 +580,7 @@ static int dma_config(struct vi_pre_dev *pdriver_dev, vi_pre_dma_cfg_t *cfg)
     int ret = 0;
     set_dma_burst_length(pdriver_dev, 16);
     set_dma_data_width(pdriver_dev, cfg->width);
-    set_bit_mode(pdriver_dev, 1);
+    set_bit_mode(pdriver_dev, 0);
     set_dma_mode(pdriver_dev, cfg->mode);
     set_dma_resolution(pdriver_dev, cfg->resolution_h, cfg->resolution_v);
 
@@ -632,12 +605,41 @@ int vi_pre_dma_config(struct vi_pre_dev *pdriver_dev, void *arg)
     return dma_config(pdriver_dev, &cfg);
 }
 
-#define VIPRE_BUS_ERR (1 << 5)
-#define VIPRE_FIFO_OVER (1 << 4)
-#define VIPRE_IDLE_DONE (1 << 3)
-#define VIPRE_NMOVERFLOW (1 << 2)
-#define VIPRE_LINE_DONE (1 << 1)
-#define VIPRE_FRAME_DONE (1 << 0)
+int vi_pre_dma_mframe_set_buf(struct vi_pre_dev *pdriver_dev, void *arg)
+{
+    int j = 0;
+    vi_pre_mframe_cfg_t mframe_cfg;
+	check_retval(copy_from_user(&mframe_cfg, arg, sizeof(mframe_cfg)));
+    unsigned long buf_base = (unsigned long)mframe_cfg.buf_addr;
+
+    for (j = 0; j < mframe_cfg.vc_num; j++) {
+        mframe_set_start_addr(pdriver_dev, mframe_cfg.frame_id, j, buf_base);
+        buf_base += mframe_cfg.frame_size;
+    }
+
+    return 0;
+}
+
+int vi_pre_dma_get_mframe_done_id(struct vi_pre_dev *pdriver_dev, void *arg)
+{
+    vi_pre_update_frame_info_t info;
+
+    info.update_frame_id = pdriver_dev->update_frame_id;
+    info.update_vc_id = pdriver_dev->update_vc_id;
+	check_retval(copy_to_user(arg, &info,sizeof(info)));
+
+    return 0;
+}
+
+int vi_pre_dma_mframe_update_buf(struct vi_pre_dev *pdriver_dev, void *arg)
+{
+    vi_pre_mframe_update_t mframe;
+	check_retval(copy_from_user(&mframe, arg, sizeof(mframe)));
+    unsigned long buf_base = (unsigned long)mframe.buf_addr;
+    mframe_set_start_addr(pdriver_dev, mframe.frame_id, mframe.vc_id, buf_base);
+
+    return 0;
+}
 
 int vi_pre_dma_start(struct vi_pre_dev *pdriver_dev)
 {
@@ -671,6 +673,26 @@ int *vi_pre_event(void)
     return &vipre_event;
 }
 
+
+static int f_done_sta_to_frame_id(u32 sta)
+{
+#define FRAME_0_DONE (1 << 11)
+#define FRAME_1_DONE (1 << 10)
+#define FRAME_2_DONE (1 << 9)
+#define FRAME_3_DONE (1 << 8)
+        int f_id = 0;
+        if (sta & FRAME_0_DONE) {
+             f_id = 3;
+        } else if (sta & FRAME_1_DONE) {
+             f_id = 0;
+        } else if (sta & FRAME_2_DONE) {
+             f_id = 1;
+        } else if (sta & FRAME_3_DONE) {
+             f_id = 2;
+        }
+        return f_id;
+}
+
 void vi_pre_dma_interrupt_handler(struct vi_pre_dev *pdriver_dev)
 {
     u32 status = 0;
@@ -678,30 +700,29 @@ void vi_pre_dma_interrupt_handler(struct vi_pre_dev *pdriver_dev)
     unsigned long flags = 0;
     //int i = 0;
 
+    spin_lock_irqsave(&pdriver_dev->slock, flags);
     status = dma_interrupt_status(pdriver_dev);
-    //printk("<0>""vipre int sta %x\n", status );
     if (status & (1 << 4)) {
         printk("<0>""vipre err int sta 0x%x\n", status);
     }
+
     dma_clear_interrupt_status(pdriver_dev, status);
-    spin_lock_irqsave(&pdriver_dev->slock, flags);
     if (status & VIPRE_FRAME_DONE) {
         pdriver_dev->cnt++;
         if (pdriver_dev->cnt >= 4) {
             pdriver_dev->cnt = 0;
-            vipre_event = 1;
         }
+        vipre_event = 1;
         f_done_sta = mframe_frame_done_flag(pdriver_dev);
-        //printk("<0>""f_done_sta int sta 0x%x\n", f_done_sta);
         mframe_frame_done_flag_clear(pdriver_dev, f_done_sta);
-        //vi_pre_dma_stop(pdriver_dev);
-        /*TODO send event*/
-        //printk("frame done %x\n", f_done_sta);
+        pdriver_dev->update_frame_id = f_done_sta_to_frame_id(f_done_sta);
+        mframe_mode_set_position(pdriver_dev, 0, pdriver_dev->update_frame_id, 0);
+        pdriver_dev->update_vc_id = 0;
     } else if (status & VIPRE_LINE_DONE) {
         //u32 nline_done_sta =;
         //pdriver_dev->cnt++;
         //printk("line done %x\n", f_done_sta);
-        vipre_event = 1;
+        //vipre_event = 1;
     }
 
 #if 0

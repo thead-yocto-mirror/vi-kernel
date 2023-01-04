@@ -1012,6 +1012,9 @@ typedef struct pp_wr_line_entry_s {
 	u32 buf_size;
 } pp_wr_line_entry_t;
 
+
+struct vvcam_isp_driver_dev;
+
 struct isp_ic_dev {
 	void __iomem *base;
 	void __iomem *reset;
@@ -1098,6 +1101,9 @@ struct isp_ic_dev {
     long long unsigned int ut_phy_addr;    //for units test
     void *ut_addr;
     struct device *device;
+    int irq_num[2];
+    int irq_is_request[2];
+    struct vvcam_isp_driver_dev *isp_driver_dev;
 };
 
 struct isp_extmem_info {

@@ -2827,12 +2827,17 @@ static long isp_get_extmem(struct isp_ic_dev *dev, void __user *args)
 	return ret;
 }
 
+int vvcam_free_isp_irq(struct isp_ic_dev *dev);
+int vvcam_request_isp_irq(struct isp_ic_dev *dev);
+
 long isp_priv_ioctl(struct isp_ic_dev *dev, unsigned int cmd, void __user *args)
 {
 	int ret = -1;
-	if (!dev) {
+
+    if (!dev) {
 		return ret;
 	}
+
 	/*isp_info("[%s:%d]cmd 0x%08x\n", __func__, __LINE__, cmd);*/
 	switch (cmd) {
 	case ISPIOC_RESET:
@@ -3672,7 +3677,12 @@ long isp_priv_ioctl(struct isp_ic_dev *dev, unsigned int cmd, void __user *args)
         ret = 0;
     }
         break;
-
+    case ISPIOC_FREE_IRQ:
+        ret = vvcam_free_isp_irq(dev);
+        break;
+    case ISPIOC_REQUEST_IRQ:
+        ret = vvcam_request_isp_irq(dev);
+        break;
 	default:
 		isp_err("unsupported command %d", cmd);
 		break;

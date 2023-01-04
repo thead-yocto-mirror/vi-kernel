@@ -106,7 +106,6 @@ struct vvcam_isp_driver_dev
     struct timer_list isp_timer;
     struct work_struct vvnative_wq;
     wait_queue_head_t irq_wait;
-    int irq_num[2];
 	void *private;
 	struct clk *aclk;
 	struct clk *hclk;
@@ -182,11 +181,11 @@ static void vvnative_isp_work(struct work_struct *work)
     }
 	if (pisp_dev->rgbgamma.data_changed) {
       //pr_info("%s pisp_dev->rgbgamma.data_changed %d\n", __func__,
-       //pisp_dev->rgbgamma.data_changed);		
+       //pisp_dev->rgbgamma.data_changed);
 	   isp_s_rgbgamma(pisp_dev);
 	}
 	if (pisp_dev->rgbgamma.changed) {
-		//pr_info("%s pisp_dev->rgbgamma.changed %d\n", __func__,pisp_dev->rgbgamma.changed);		
+		//pr_info("%s pisp_dev->rgbgamma.changed %d\n", __func__,pisp_dev->rgbgamma.changed);
 		if (pisp_dev->rgbgamma.enable) {
 			isp_enable_rgbgamma(pisp_dev);
 		} else {
@@ -401,6 +400,50 @@ static const struct dev_pm_ops vvcam_isp_runtime_pm_ops = {
 	SET_RUNTIME_PM_OPS(vvcam_isp_runtime_suspend, vvcam_isp_runtime_resume, NULL)
 };
 
+int vvcam_free_isp_irq(struct isp_ic_dev *dev)
+{
+    if (dev->irq_is_request[1] == 0) {
+        return 0;
+    }
+
+    free_irq(dev->irq_num[1], dev->isp_driver_dev);
+    dev->irq_is_request[1] = 0;
+	pr_info("%s isp free irq\n", __func__);
+
+    return 0;
+}
+
+int vvcam_request_isp_irq(struct isp_ic_dev *dev)
+{
+    if (dev->irq_is_request[1] == 1) {
+        return 0;
+    }
+
+    uint32_t irq_mask0 = isp_read_reg(dev, REG_ADDR(miv2_imsc));
+    uint32_t irq_mask1 = isp_read_reg(dev, REG_ADDR(miv2_imsc1));
+    uint32_t irq_mask2 = isp_read_reg(dev, REG_ADDR(miv2_imsc2));
+
+    isp_write_reg(dev, REG_ADDR(miv2_icr), 0xfffffff);
+    isp_write_reg(dev, REG_ADDR(miv2_icr1), 0xfffffff);
+    isp_write_reg(dev, REG_ADDR(miv2_icr2), 0xfffffff);
+
+	int ret = devm_request_irq(dev->device, dev->irq_num[1], vvcam_mi_irq,
+		IRQF_TRIGGER_RISING, "MI_IRQ", (char *)dev->isp_driver_dev);
+	if (ret) {
+		pr_err("%s, %d:request irq error, 0x%lx!\n", __func__, __LINE__, ret);
+		return ret;
+	}
+
+    isp_write_reg(dev, REG_ADDR(miv2_imsc), irq_mask0);
+    isp_write_reg(dev, REG_ADDR(miv2_imsc1), irq_mask1);
+    isp_write_reg(dev, REG_ADDR(miv2_imsc2), irq_mask2);
+
+    dev->irq_is_request[1] = 1;
+	pr_info("%s isp request irq\n", __func__);
+
+    return ret;
+}
+
 static int vvcam_isp_open(struct inode * inode, struct file * file)
 {
 	struct vvcam_isp_driver_dev *pdriver_dev;
@@ -568,38 +611,42 @@ static int vvcam_isp_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, pdriver_dev);
 	pdriver_dev->pdev = pdev;
-	pdriver_dev->irq_num[0] = platform_get_irq(pdev, 0);
-	if (pdriver_dev->irq_num[0] == 0) {
+	pisp_dev->irq_num[0] = platform_get_irq(pdev, 0);
+	if (pisp_dev->irq_num[0] == 0) {
 		pr_err("%s:isp[%d]: could not map IRQ\n", __func__, pdev->id);
 		dev_err(&pdev->dev, "could not map IRQ.\n");
 		return -ENXIO;
 	}
-	pr_info("%s:isp[%d]: pdriver_dev->irq_num[0]=%d\n", __func__, pdev->id, pdriver_dev->irq_num[0]);
+	pr_info("%s:isp[%d]: pisp_dev->irq_num[0]=%d\n", __func__, pdev->id, pisp_dev->irq_num[0]);
 
-	pdriver_dev->irq_num[1] = platform_get_irq(pdev, 1);
-	if (pdriver_dev->irq_num[1] == 0) {
+	pisp_dev->irq_num[1] = platform_get_irq(pdev, 1);
+	if (pisp_dev->irq_num[1] == 0) {
 		pr_err("%s:isp[%d]: could not map IRQ\n", __func__, pdev->id);
 		dev_err(&pdev->dev, "could not map IRQ.\n");
 		return -ENXIO;
 	}
-	pr_info("%s:isp[%d]: pdriver_dev->irq_num[1]=%d\n", __func__, pdev->id, pdriver_dev->irq_num[1]);
+	pr_info("%s:isp[%d]: pisp_dev->irq_num[1]=%d\n", __func__, pdev->id, pisp_dev->irq_num[1]);
 
 	/*init work queue*/
 	INIT_WORK(&pdriver_dev->vvnative_wq,  vvnative_isp_work);
 
-	ret = devm_request_irq(&pdev->dev, pdriver_dev->irq_num[0], vvcam_isp_irq,
+	ret = devm_request_irq(&pdev->dev, pisp_dev->irq_num[0], vvcam_isp_irq,
 				IRQF_TRIGGER_RISING | IRQF_SHARED, "ISP_IRQ", (char *)pdriver_dev);
 	if (ret) {
 		pr_err("%s[%d]:request irq error!\n", __func__, __LINE__);
 		return ret;
 	}
+    pisp_dev->irq_is_request[0] = 1;
 
-	ret = devm_request_irq(&pdev->dev, pdriver_dev->irq_num[1], vvcam_mi_irq,
+    pisp_dev->isp_driver_dev = pdriver_dev;
+
+	ret = devm_request_irq(&pdev->dev, pisp_dev->irq_num[1], vvcam_mi_irq,
 		IRQF_TRIGGER_RISING, "MI_IRQ", (char *)pdriver_dev);
 	if (ret) {
 		pr_err("%s[%d]:request irq error!\n", __func__, __LINE__);
 		return ret;
 	}
+    pisp_dev->irq_is_request[1] = 1;
 
 	init_waitqueue_head(&pdriver_dev->irq_wait);
 
@@ -710,8 +757,11 @@ static int vvcam_isp_remove(struct platform_device *pdev)
         pisp_dev->ut_addr =NULL;
     }
 
-	free_irq(pdriver_dev->irq_num[0], pdriver_dev);
-	free_irq(pdriver_dev->irq_num[1], pdriver_dev);
+	free_irq(pisp_dev->irq_num[0], pdriver_dev);
+	free_irq(pisp_dev->irq_num[1], pdriver_dev);
+    pisp_dev->irq_is_request[0] = 0;
+    pisp_dev->irq_is_request[1] = 0;
+
 	cdev_del(&pdriver_dev->cdev);
 	device_destroy(pdriver_dev->class, pdriver_dev->devt);
 

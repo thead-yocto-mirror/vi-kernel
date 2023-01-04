@@ -210,6 +210,9 @@ enum {
 	ISPIOC_CFG_DMA_LINE_ENTRY   = 0x196,
 	ISPIOC_S_CROP   			= 0x197,
     ISPIOC_GET_FRAME_MASK_INFO_ADDR = 0x198,
+    ISPIOC_FREE_IRQ             = 0x199,
+    ISPIOC_REQUEST_IRQ          = 0x200,
+
 };
 
 #define  ISP_GEN_CFG_UPDATE(dev)	{                                \

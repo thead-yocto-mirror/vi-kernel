@@ -398,7 +398,6 @@ int flash_led_init(struct flash_led_ctrl *dev)
     }
 
     if (floodlight->i2c_bus == projection->i2c_bus) {
-	    pr_info("%s, %d, floodlight->i2c_bus = %d projection->i2c_bus %d\n", __func__, __LINE__, floodlight->i2c_bus, projection->i2c_bus);
         ret = register_i2c_client(floodlight);
 	    if (ret != 0) {
 		    pr_err("[%s]: register_i2c_client flash_led_idx = %d failed\n",__func__, dev->device_idx);
@@ -408,7 +407,6 @@ int flash_led_init(struct flash_led_ctrl *dev)
         projection->i2c_client = floodlight->i2c_client;
     } else {
         if (floodlight->i2c_bus != UNDEFINED_IN_DTS) {
-	        pr_info("%s, %d, floodlight->i2c_bus = %d \n", __func__, __LINE__, floodlight->i2c_bus);
             ret = register_i2c_client(floodlight);
 	        if (ret != 0) {
 		        pr_err("[%s]: floodlight register_i2c_client flash_led_idx = %d failed\n",__func__, dev->device_idx);
@@ -417,7 +415,6 @@ int flash_led_init(struct flash_led_ctrl *dev)
         }
 
         if (projection->i2c_bus != UNDEFINED_IN_DTS) {
-	        pr_info("%s, %d, projection->i2c_bus %d\n", __func__, __LINE__, projection->i2c_bus);
             ret = register_i2c_client(projection);
 	        if (ret != 0) {
 		        pr_err("[%s]: projection register_i2c_client flash_led_idx = %d failed\n",__func__, dev->device_idx);

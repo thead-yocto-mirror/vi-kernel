@@ -67,11 +67,15 @@ int isp_enable_rgbgamma(struct isp_ic_dev *dev)
 	pr_err("unsupported function %s\n", __func__);
 	return -1;
 #else
-
+	if (dev->rgbgamma.changed) {
 	u32 isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
 
 	REG_SET_SLICE(isp_ctrl, ISP_RGBGC_ENABLE, 1);
-	isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl);
+	isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl); 
+	dev->rgbgamma.changed = false;
+	} else {
+		dev->rgbgamma.changed = true;
+	}
 	dev->rgbgamma.enable = true;
 	return 0;
 #endif
@@ -83,11 +87,15 @@ int isp_disable_rgbgamma(struct isp_ic_dev *dev)
 	pr_err("unsupported function %s\n", __func__);
 	return -1;
 #else
-	u32 isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
+	if (dev->rgbgamma.changed) {
+		u32 isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
 
-	REG_SET_SLICE(isp_ctrl, ISP_RGBGC_ENABLE, 0);
-	isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl);
-
+		REG_SET_SLICE(isp_ctrl, ISP_RGBGC_ENABLE, 0);
+		isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl);
+		dev->rgbgamma.changed = false;
+	} else {
+		dev->rgbgamma.enable = true;
+	}
 	dev->rgbgamma.enable = false;
 	return 0;
 #endif
@@ -194,23 +202,25 @@ static int isp_s_rgbgammaWriteData(struct isp_ic_dev *dev,
 }
 #endif
 
-int isp_s_rgbgamma(struct isp_ic_dev *dev, struct isp_rgbgamma_data *data)
+int isp_s_rgbgamma(struct isp_ic_dev *dev)
 {
 #ifndef ISP_RGBGC_RY
 	pr_err("unsupported function %s", __func__);
 	return -1;
 #else
 	u8 ret;
-	u32 isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
-
-	REG_SET_SLICE(isp_ctrl, ISP_RGBGC_ENABLE, 0);
-	isp_write_reg(dev, REG_ADDR(isp_ctrl), isp_ctrl);
-
-	isp_s_rgbgammapx(dev, data);
-	isp_s_rgbgammaWriteData(dev, data);
-	ret = 0;
-	if (dev->rgbgamma.enable) {
-		 ret = isp_enable_rgbgamma(dev);
+	if (dev->rgbgamma.data_changed) {
+		u32 isp_ctrl = isp_read_reg(dev, REG_ADDR(isp_ctrl));
+		isp_s_rgbgammapx(dev, dev->rgbgamma.data);
+		isp_s_rgbgammaWriteData(dev, dev->rgbgamma.data);
+		ret = 0;
+		if (dev->rgbgamma.enable) {
+			ret = isp_enable_rgbgamma(dev);
+		}
+		dev->rgbgamma.data_changed = false;
+		kfree(dev->rgbgamma.data);
+	} else {
+		dev->rgbgamma.data_changed = true;
 	}
     return ret;
 #endif

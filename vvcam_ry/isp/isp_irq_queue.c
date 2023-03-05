@@ -238,3 +238,18 @@ int isp_irq_write_circle_queue(isp_mis_t* data, isp_mis_list_t* pCList)
   return 0;
 }
 
+int isp_irq_reset_circle_queue(isp_mis_list_t* pCList)
+{
+#ifdef __KERNEL__
+ 
+  if (pCList == NULL) {
+      isp_err("%s: can not reset circle queue\n", __func__);
+      return -1;
+  }
+
+  pCList->pRead = pCList->pHead;
+  pCList->pWrite = pCList->pHead;
+
+#endif
+  return 0;
+}

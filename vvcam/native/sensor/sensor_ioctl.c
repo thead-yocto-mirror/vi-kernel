@@ -391,9 +391,12 @@ long sensor_priv_ioctl(struct vvcam_sensor_dev *dev, unsigned int cmd, void __us
 
 		case VVSENSORIOC_SENSOR_SCCB_CFG:
 		{
+            /*
 			struct vvcam_sccb_cfg_s sccb_config;
 			check_retval(copy_from_user(&sccb_config, args, sizeof(sccb_config)));
 			ret = vvcam_sensor_sccb_config(dev,&sccb_config);
+            */
+            ret = 0;
 			break;
 		}
 

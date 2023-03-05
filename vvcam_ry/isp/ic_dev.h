@@ -674,6 +674,7 @@ struct isp_exp2_context {
 	/* write 4096/8192 EXPV2 mean value to dma by MI MP-JDP path. */
 	/* physical address, alloacte by user */
 	u64 pa;
+	uint8_t* va;
 };
 
 #define ISP_2DNR_SIGMA_BIN 60
@@ -914,6 +915,9 @@ struct isp_rgbgamma_data {
 
 struct isp_rgbgamma_context {
 	bool enable;
+	struct isp_rgbgamma_data *data;
+	bool data_changed;
+	bool changed;
 };
 
 struct isp_irq_data {

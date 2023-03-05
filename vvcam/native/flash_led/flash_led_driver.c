@@ -102,29 +102,35 @@ int flash_led_switch(struct flash_led_ctrl *pflash_led_dev ,uint64_t frame_id)
 
     struct flash_led_dev *floodlight = &pflash_led_dev->floodlight;
     struct flash_led_dev *projection = &pflash_led_dev->projection;
-    bool floodlight_on =false;
-    bool projection_on =false;
+    bool floodlight_on = false;
+    bool projection_on = false;
     switch(pflash_led_dev->switch_mode)
     {
         case  PROJECTION_EVEN_FLOODLIGHT_ODD:
-                    if(frame_id%2)
-                        projection_on = true;
-                    else
-                        floodlight_on =true;
-                    break;
+                if(frame_id%2)
+                    projection_on = true;
+                else
+                    floodlight_on = true;
+                break;
         case  PROJECTION_ODD_FLOODLIGHT_EVEN:
-                    if(frame_id%2)
-                        floodlight_on = true;
-                    else
-                        projection_on =true;
-                    break;
+                if(frame_id%2)
+                    floodlight_on = true;
+                else
+                    projection_on = true;
+                break;
         case  PROJECTION_ALWAYS_ON:
-                     projection_on = true;
-                     break;
+                projection_on = true;
+                break;
         case  FLOODLIGHT_ALWAYS_ON:
-                    floodlight_on =true;
-                    break;
+                floodlight_on = true;
+                break;
+        case  BOTH_ON:
+                projection_on = true;
+                floodlight_on = true;
+                break;
         case  BOTH_OFF:
+                projection_on = false;
+                floodlight_on = false;
                 break;
         default:
             pr_warn("invald switch mode:%d\n",pflash_led_dev->switch_mode);
@@ -165,10 +171,12 @@ static int flash_led_open(struct inode * inode, struct file * file)
     struct flash_led_dev *floodlight = &pflash_led_dev->floodlight;
     struct flash_led_dev *projection = &pflash_led_dev->projection;
 
-    irq = gpio_to_irq(pflash_led_dev->touch_pin);
-    request_irq(irq, touch_pin_isr, IRQF_TRIGGER_FALLING,
-                "flash led touch pin",
-                pflash_led_dev);
+    if (pflash_led_dev->touch_pin != -1) {
+        irq = gpio_to_irq(pflash_led_dev->touch_pin);
+        request_irq(irq, touch_pin_isr, IRQF_TRIGGER_FALLING,
+                    "flash led touch pin",
+                    pflash_led_dev);
+    }
 
     if (floodlight->flash_led_func != NULL) {
         ret = floodlight->flash_led_func->init(floodlight);
@@ -200,8 +208,10 @@ static int flash_led_release(struct inode * inode, struct file * file)
     struct flash_led_dev *floodlight = &pflash_led_dev->floodlight;
     struct flash_led_dev *projection = &pflash_led_dev->projection;
 
-    irq = gpio_to_irq(pflash_led_dev->touch_pin);
-    free_irq(irq, pflash_led_dev);
+    if (pflash_led_dev->touch_pin != -1) {
+        irq = gpio_to_irq(pflash_led_dev->touch_pin);
+        free_irq(irq, pflash_led_dev);
+    }
 
     pflash_led_dev->enable = 0;
 
@@ -268,6 +278,7 @@ static int flash_led_of_parse(struct platform_device *pdev)
 			pr_err("%s:flash_led_touch request failed\n", __func__);
 		}
 	} else {
+        pflash_led_dev->touch_pin = -1;
 		pr_err("flash_led_touch not defined for %s\n", pflash_led_dev->flash_led_name);
 	}
 
@@ -441,7 +452,12 @@ static void flash_led_interrupt_func(struct work_struct *work)
         }
         return;
     }
-    flash_led_switch(pflash_led_dev,frame_irq_cnt);
+
+    if (pflash_led_dev->switch_mode != BOTH_ON \
+        && pflash_led_dev->switch_mode != BOTH_OFF) {
+        flash_led_switch(pflash_led_dev,frame_irq_cnt);
+    }
+
     if ((frame_irq_cnt % 2) == 0) {
 
         if (!IS_ERR(pflash_led_dev->floodlight_adc)) {
@@ -471,7 +487,9 @@ static irqreturn_t touch_pin_isr(int irq, void *dev)
 
 static int flash_pin_init(struct flash_led_ctrl *dev)
 {
-    gpio_request(dev->touch_pin, "flash led touch pin");
+    if (dev->touch_pin != -1) {
+        gpio_request(dev->touch_pin, "flash led touch pin");
+    }
 
     INIT_WORK(&dev->flash_led_work, flash_led_interrupt_func);
 
@@ -496,7 +514,11 @@ static int touch_pin_uinit(struct flash_led_ctrl *dev)
 {
     dev->enable = 0;
     cancel_work_sync(&dev->flash_led_work);
-    gpio_free(dev->touch_pin);
+
+    if (dev->touch_pin != -1) {
+        gpio_free(dev->touch_pin);
+    }
+
     return 0;
 }
 

@@ -217,6 +217,7 @@ typedef struct vvcam_mode_info {
 	uint32_t reg_data_count;
     uint32_t mipi_phy_freq;
     uint32_t mipi_line_num;
+    char *config_file_3a;
 } vvcam_mode_info_t;
 
 typedef struct sensor_blc_s

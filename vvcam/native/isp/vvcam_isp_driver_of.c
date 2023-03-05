@@ -340,10 +340,10 @@ static int vvcam_isp_runtime_suspend(struct device *dev)
 	clk_disable_unprepare(pdriver_dev->hclk);
 	clk_disable_unprepare(pdriver_dev->isp0_pclk);
 	clk_disable_unprepare(pdriver_dev->cclk);
-	if (IS_ERR(pdriver_dev->isp1_pclk))
-		dev_err(dev, "isp1_pclk is null\n");
-	else
+	if (!IS_ERR_OR_NULL(pdriver_dev->isp1_pclk)) {
 		clk_disable_unprepare(pdriver_dev->isp1_pclk);
+	}
+		
 	pr_info("isp %s\n", __func__);
 	return 0;
 }
@@ -454,8 +454,8 @@ static int vvcam_isp_open(struct inode * inode, struct file * file)
 	file->private_data = pdriver_dev;
 	pisp_dev = pdriver_dev->private;
 	struct device *dev = &pdriver_dev->pdev->dev;
-	/*create circle queue*/
-	isp_irq_create_circle_queue(&(pisp_dev->circle_list), QUEUE_NODE_COUNT);
+
+	isp_irq_reset_circle_queue(&(pisp_dev->circle_list));
 	if (pm_runtime_get_sync(dev)) {
 		ret = vvcam_isp_runtime_resume(dev);
 		if (ret)
@@ -494,6 +494,9 @@ static int vvcam_isp_release(struct inode * inode, struct file * file)
 	int ret = 0;
 	struct vvcam_isp_driver_dev *pdriver_dev;
 	struct isp_ic_dev *pisp_dev;
+
+	pr_info("enter %s\n", __func__);
+
 	if ((inode == NULL) || (file == NULL) ) {
 		pr_info("%s: %dx\n", __func__, __LINE__);
 		return 0;
@@ -503,8 +506,8 @@ static int vvcam_isp_release(struct inode * inode, struct file * file)
 	struct device *dev = &pdriver_dev->pdev->dev;
 	file->private_data = pdriver_dev;
 	pisp_dev = pdriver_dev->private;
-	pr_info("enter %s\n", __func__);
-	isp_irq_destroy_circle_queue(&(pisp_dev->circle_list));
+
+	isp_force_stop(pisp_dev);
 
     if (pisp_dev->ut_addr != NULL) {
         #define UT_USED_SIZE 0x01000000
@@ -517,6 +520,8 @@ static int vvcam_isp_release(struct inode * inode, struct file * file)
 	if (ret) {
 		pr_err("fail to suspen isp %s %d ret = %d\n", __func__, __LINE__, ret);
 	}
+
+	pr_info("exit %s\n", __func__);
 	return 0;
 };
 
@@ -581,6 +586,7 @@ static int vvcam_isp_probe(struct platform_device *pdev)
 		return  -ENOMEM;
 	}
 	memset(pisp_dev,0,sizeof(struct isp_ic_dev ));
+	isp_irq_create_circle_queue(&(pisp_dev->circle_list), QUEUE_NODE_COUNT);
 	pr_info("%s:isp[%d]: psensor_dev =0x%px\n", __func__,pdev->id,pisp_dev);
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -673,10 +679,12 @@ static int vvcam_isp_probe(struct platform_device *pdev)
 		//return -1;
 	}
 
-	pdriver_dev->isp1_pclk = devm_clk_get(&pdev->dev, "isp1_pclk");
-	if (IS_ERR(pdriver_dev->isp1_pclk)) {
-		dev_err(&pdev->dev, "failed to get isp1_pclk");
-		//return -1;
+	if (pdriver_dev->device_idx == 1) {
+		pdriver_dev->isp1_pclk = devm_clk_get(&pdev->dev, "isp1_pclk");
+		if (IS_ERR(pdriver_dev->isp1_pclk)) {
+			dev_err(&pdev->dev, "failed to get isp1_pclk");
+			//return -1;
+		}
 	}
 
 	if ((devise_register_index == 0)) {
@@ -724,11 +732,11 @@ static int vvcam_isp_probe(struct platform_device *pdev)
 	struct device *dev = &pdriver_dev->pdev->dev;
 	pm_runtime_enable(dev);
 
-	ret = vvcam_isp_runtime_resume(dev);
+	ret = pm_runtime_resume_and_get(dev);
 	if (ret < 0) {
 		dev_err(dev, "fail to resume isp\n");
 	}
-	vvcam_isp_runtime_suspend(dev);
+	ret = pm_runtime_put_sync(dev);
 	if (ret < 0) {
 		dev_err(dev, "fail to suspend isp\n");
 	}
@@ -762,6 +770,10 @@ static int vvcam_isp_remove(struct platform_device *pdev)
     pisp_dev->irq_is_request[0] = 0;
     pisp_dev->irq_is_request[1] = 0;
 
+	isp_irq_destroy_circle_queue(&(pisp_dev->circle_list));
+	struct device *dev = &pdev->dev;
+	pm_runtime_disable(dev);
+	
 	cdev_del(&pdriver_dev->cdev);
 	device_destroy(pdriver_dev->class, pdriver_dev->devt);
 

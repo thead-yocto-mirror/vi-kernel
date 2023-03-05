@@ -344,7 +344,7 @@ int isp_disable_gcmono(struct isp_ic_dev *dev);
 int isp_s_gcmono(struct isp_ic_dev *dev, struct isp_gcmono_data *data);	/* set curve */
 int isp_enable_rgbgamma(struct isp_ic_dev *dev);
 int isp_disable_rgbgamma(struct isp_ic_dev *dev);
-int isp_s_rgbgamma(struct isp_ic_dev *dev, struct isp_rgbgamma_data *data);
+int isp_s_rgbgamma(struct isp_ic_dev *dev);
 
 u32 isp_read_mi_irq(struct isp_ic_dev *dev);
 void isp_reset_mi_irq(struct isp_ic_dev *dev, u32 icr);
@@ -429,4 +429,5 @@ int isp_set_crop(struct isp_ic_dev *dev);
 int isp_ioc_g_feature(struct isp_ic_dev *dev, void __user *args);
 int isp_ioc_g_feature_veresion(struct isp_ic_dev *dev, void __user *args);
 
+void ry_force_stop(struct isp_ic_dev *dev);
 #endif /* _ISP_IOC_H_ */

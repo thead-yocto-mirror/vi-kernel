@@ -50,7 +50,8 @@ typedef enum {
     PROJECTION_ODD_FLOODLIGHT_EVEN = 1,
     PROJECTION_ALWAYS_ON = 2,
     FLOODLIGHT_ALWAYS_ON = 3,
-    BOTH_OFF =4,
+    BOTH_ON = 4,
+    BOTH_OFF = 5,
 } flash_led_switch_mod_t;
 
 typedef struct {

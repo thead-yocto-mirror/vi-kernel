@@ -254,6 +254,9 @@ static int vvcam_dwe_release(struct inode * inode, struct file * file)
 	struct task_struct *owner =  (struct task_struct *)(atomic_long_read(&pdw200->vvmutex->owner) & ~0x07);
 	if (owner == pdriver_dev->locker && owner != NULL) {
 		printk("unlocked with owner=%p\n", owner);
+		dwe_reset(pdw200);
+    	vse_reset(pdw200);
+		dwe_disable_irq(pdw200);
 		mutex_unlock(pdw200->vvmutex);
 	}
 	/*destory circle queue*/

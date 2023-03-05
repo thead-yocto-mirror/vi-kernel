@@ -437,4 +437,5 @@ int isp_set_crop(struct isp_ic_dev *dev);
 int isp_ioc_g_feature(struct isp_ic_dev *dev, void __user *args);
 int isp_ioc_g_feature_veresion(struct isp_ic_dev *dev, void __user *args);
 
+void isp_force_stop(struct isp_ic_dev *dev);
 #endif /* _ISP_IOC_H_ */

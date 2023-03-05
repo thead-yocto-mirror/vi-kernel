@@ -418,12 +418,7 @@ int isp_s_dmsc(struct isp_ic_dev *dev)
 	isp_write_reg(dev, REG_ADDR(isp_dmsc_ctrl), isp_dmsc_ctrl);
 
 	isp_set_dmsc_intp(dev);
-	isp_set_dmsc_dmoi(dev);
-	isp_set_dmsc_skin(dev);
 	isp_enable_dmsc(dev);
-	isp_set_dmsc_depurple(dev);
-	isp_set_dmsc_sharpen_line(dev);
-	isp_set_dmsc_sharpen(dev);
 	isp_set_dmsc_gfilter(dev);
 
 	return 0;

@@ -115,5 +115,6 @@ int vse_read_irq(struct dw200_subdev *dev, u32 *ret);
 int vse_start_dma_read(struct dw200_subdev *dev, u64 addr);
 /* mi output pa */
 int vse_update_buffers(struct dw200_subdev *dev, u64 *addr);
+void visys_reset(void);
 
 #endif // _DWE_IOC_H_

@@ -974,6 +974,19 @@ int isp_stop_stream(struct isp_ic_dev *dev)
 	return 0;
 }
 
+void isp_force_stop(struct isp_ic_dev *dev)
+{
+	pr_info("enter %s\n", __func__);
+	isp_disable(dev);
+	mdelay(40);
+	isp_mi_stop(dev);
+	isp_stop_stream(dev);
+	isp_reset(dev);
+	pr_info("exit %s\n", __func__);
+	return;
+}
+
+
 int isp_s_cc(struct isp_ic_dev *dev)
 {
 	struct isp_cc_context *cc = &dev->cc;

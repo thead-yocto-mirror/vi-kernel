@@ -92,6 +92,7 @@ int isp_irq_create_circle_queue(isp_mis_list_t* pCList, int number);
 int isp_irq_destroy_circle_queue(isp_mis_list_t* pCList);
 int isp_irq_read_circle_queue(isp_mis_t* data, isp_mis_list_t* pCList);
 int isp_irq_write_circle_queue(isp_mis_t* data, isp_mis_list_t* pCList);
+int isp_irq_reset_circle_queue(isp_mis_list_t* pCList);
 #endif
 
 #endif

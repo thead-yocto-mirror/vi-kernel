@@ -160,7 +160,19 @@ static void vvnative_isp_work(struct work_struct *work)
        pisp_dev->gamma_out.changed);
        isp_s_gamma_out(pisp_dev);
     }
-
+	if (pisp_dev->rgbgamma.data_changed) {
+      //pr_info("%s pisp_dev->rgbgamma.data_changed %d\n", __func__,
+       //pisp_dev->rgbgamma.data_changed);		
+	   isp_s_rgbgamma(pisp_dev);
+	}
+	if (pisp_dev->rgbgamma.changed) {
+		//pr_info("%s pisp_dev->rgbgamma.changed %d\n", __func__,pisp_dev->rgbgamma.changed);		
+		if (pisp_dev->rgbgamma.enable) {
+			isp_enable_rgbgamma(pisp_dev);
+		} else {
+			isp_disable_rgbgamma(pisp_dev);
+		}
+	}
   }
 
 }
@@ -186,13 +198,13 @@ static irqreturn_t vvcam_ry_isp_irq(int irq, void *dev_id)
 		  isp_write_reg(pisp_dev, REG_ADDR(isp_imsc), isp_read_reg(pisp_dev, REG_ADDR(isp_imsc))&(~MRV_ISP_MIS_ISP_OFF_MASK));
 	  }
   if (isp_mis & MRV_ISP_MIS_FLASH_ON_MASK)
-	  mi_mis |= 0x1;
+	  mi_mis |= (0x1 | MP_JDP_FRAME_END_MASK); // line mode ry 3a start after frame done
   }
 
-  if (isp_mis & MRV_ISP_MIS_VSM_END_MASK) { // MP_JDP_FRAME_END
+  //if (isp_mis & MRV_ISP_MIS_VSM_END_MASK) { // MP_JDP_FRAME_END
     //isp_info("%s MRV_ISP_MIS_VSM_END_MASK >>> MP_JDP_FRAME_END_MASK...\n", __func__);
-    mi_mis |= MP_JDP_FRAME_END_MASK;
-  }
+    //mi_mis |= MP_JDP_FRAME_END_MASK;
+  //}
 
   if (isp_mis & MRV_ISP_MIS_SHUTTER_OFF_MASK) { // drop frame
 	//isp_info("%s drop frame\n", __func__);
@@ -301,10 +313,11 @@ static irqreturn_t vvcam_ry_mi_irq(int irq, void *dev_id)
 static int vvcam_isp_runtime_suspend(struct device *dev)
 {
 	struct vvcam_isp_driver_dev *pdriver_dev = dev_get_drvdata(dev);
+	pr_info("ry %s enter\n", __func__);
 	clk_disable_unprepare(pdriver_dev->aclk);
 	clk_disable_unprepare(pdriver_dev->hclk);
 	clk_disable_unprepare(pdriver_dev->cclk);
-	pr_info("ry %s\n", __func__);
+	pr_info("ry %s exit\n", __func__);
 	return 0;
 }
 static int vvcam_isp_runtime_resume(struct device *dev)
@@ -346,8 +359,8 @@ static int vvcam_isp_open(struct inode * inode, struct file * file)
 	pdriver_dev = container_of(inode->i_cdev, struct vvcam_isp_driver_dev, cdev);
 	file->private_data = pdriver_dev;
 	pisp_dev = pdriver_dev->private;
-	/*create circle queue*/
-	isp_irq_create_circle_queue(&(pisp_dev->circle_list), QUEUE_NODE_COUNT);
+
+	isp_irq_reset_circle_queue(&(pisp_dev->circle_list));
 	struct device *dev = &pdriver_dev->pdev->dev;
 
 	if (pm_runtime_get_sync(dev)) {
@@ -388,6 +401,9 @@ static int vvcam_isp_release(struct inode * inode, struct file * file)
 	int ret = 0;
 	struct vvcam_isp_driver_dev *pdriver_dev;
 	struct isp_ic_dev *pisp_dev;
+
+	pr_info("ry enter %s\n", __func__);
+
 	if ((inode == NULL) || (file == NULL) ) {
 		isp_info("%s: %dx\n", __func__, __LINE__);
 		return 0;
@@ -396,8 +412,8 @@ static int vvcam_isp_release(struct inode * inode, struct file * file)
 	pdriver_dev = container_of(inode->i_cdev, struct vvcam_isp_driver_dev, cdev);
 	file->private_data = pdriver_dev;
 	pisp_dev = pdriver_dev->private;
-	pr_info("enter %s\n", __func__);
-	isp_irq_destroy_circle_queue(&(pisp_dev->circle_list));
+
+	ry_force_stop(pisp_dev);
 
 	struct device *dev = &pdriver_dev->pdev->dev;
     if (pisp_dev->ut_addr != NULL) {
@@ -417,6 +433,8 @@ static int vvcam_isp_release(struct inode * inode, struct file * file)
 	if (pm_runtime_put_sync(dev)) {
 		pr_info("fail to resume isp %s %d\n", __func__, __LINE__);
 	}
+
+	pr_info("ry exit %s\n", __func__);
 
 	return 0;
 };
@@ -482,6 +500,7 @@ static int vvcam_isp_probe(struct platform_device *pdev)
 		return  -ENOMEM;
 	}
 	memset(pisp_dev,0,sizeof(struct isp_ic_dev ));
+	isp_irq_create_circle_queue(&(pisp_dev->circle_list), QUEUE_NODE_COUNT);
 	pr_info("%s:isp[%d]: psensor_dev =0x%px\n", __func__,pdev->id,pisp_dev);
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -598,11 +617,11 @@ static int vvcam_isp_probe(struct platform_device *pdev)
 	struct device *dev = &pdriver_dev->pdev->dev;
 	pm_runtime_enable(dev);
 
-	ret = vvcam_isp_runtime_resume(dev);
+	ret = pm_runtime_resume_and_get(dev);
 	if (ret < 0) {
 		dev_err(dev, "fail to resume isp ry\n");
 	}
-	vvcam_isp_runtime_suspend(dev);
+	ret = pm_runtime_put_sync(dev);
 	if (ret < 0) {
 		dev_err(dev, "fail to suspend isp ry\n");
 	}
@@ -631,6 +650,11 @@ static int vvcam_isp_remove(struct platform_device *pdev)
 
 	free_irq(pdriver_dev->irq_num[0], pdriver_dev);
 	free_irq(pdriver_dev->irq_num[1], pdriver_dev);
+
+	isp_irq_destroy_circle_queue(&(pisp_dev->circle_list));
+	struct device *dev = &pdev->dev;
+	pm_runtime_disable(dev);
+
 	cdev_del(&pdriver_dev->cdev);
 	device_destroy(pdriver_dev->class, pdriver_dev->devt);
 
